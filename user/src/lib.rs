@@ -1,6 +1,5 @@
 #![no_std]
 #![feature(linkage)]
-#![feature(alloc_error_handler)]
 
 #[macro_use]
 pub mod console;
@@ -33,11 +32,6 @@ static mut HEAP_SPACE: [u8; USER_HEAP_SIZE] = [0; USER_HEAP_SIZE];
 
 #[global_allocator]
 static HEAP: LockedHeap = LockedHeap::empty();
-
-#[alloc_error_handler]
-pub fn handle_alloc_error(layout: core::alloc::Layout) -> ! {
-    panic!("Heap allocation error, layout = {:?}", layout);
-}
 
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".text.entry")]
