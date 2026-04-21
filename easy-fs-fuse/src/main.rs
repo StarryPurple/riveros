@@ -68,10 +68,9 @@ fn easy_fs_pack() -> std::io::Result<()> {
     let apps: Vec<_> = read_dir(src_path)
         .unwrap()
         .into_iter()
-        .map(|dir_entry| {
-            let mut name_with_ext = dir_entry.unwrap().file_name().into_string().unwrap();
-            name_with_ext.drain(name_with_ext.find('.').unwrap()..name_with_ext.len());
-            name_with_ext
+        .filter_map(|dir_entry| {
+            let name_with_ext = dir_entry.ok()?.file_name().into_string().ok()?;
+            name_with_ext.strip_suffix(".rs").map(str::to_owned)
         })
         .collect();
     for app in apps {
