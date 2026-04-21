@@ -4,7 +4,7 @@ on: [push]
 
 env:
   CARGO_TERM_COLOR: always
-  rust_toolchain: nightly-2025-02-18
+  rust_toolchain: stable
 
 jobs:
   build-doc:
@@ -68,4 +68,3 @@ jobs:
       - name: Run usertests
         run: cd os && make run TEST=1
         timeout-minutes: 10
-
