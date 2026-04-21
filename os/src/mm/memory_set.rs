@@ -234,7 +234,7 @@ impl MemorySet {
     pub fn activate(&self) {
         let satp = self.page_table.token();
         unsafe {
-            satp::write(satp);
+            satp::write(satp::Satp::from_bits(satp));
             asm!("sfence.vma");
         }
     }
