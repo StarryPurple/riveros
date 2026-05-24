@@ -358,12 +358,10 @@ bitflags! {
 #[allow(unused)]
 pub fn remap_test() {
     let mut kernel_space = KERNEL_SPACE.exclusive_access();
-    let mid_text: VirtAddr =
-        ((linker_symbol_addr!(stext) + linker_symbol_addr!(etext)) / 2).into();
+    let mid_text: VirtAddr = ((linker_symbol_addr!(stext) + linker_symbol_addr!(etext)) / 2).into();
     let mid_rodata: VirtAddr =
         ((linker_symbol_addr!(srodata) + linker_symbol_addr!(erodata)) / 2).into();
-    let mid_data: VirtAddr =
-        ((linker_symbol_addr!(sdata) + linker_symbol_addr!(edata)) / 2).into();
+    let mid_data: VirtAddr = ((linker_symbol_addr!(sdata) + linker_symbol_addr!(edata)) / 2).into();
     assert!(
         !kernel_space
             .page_table
