@@ -199,8 +199,8 @@ impl Runtime {
             // enough space to actually get an aligned pointer in the first place).
             let s_ptr = (s_ptr as usize & !7) as *mut u8;
 
-            available.ctx.x1 = guard as u64; //ctx.x1  is old return address
-            available.ctx.nx1 = f as u64; //ctx.nx2 is new return address
+            available.ctx.x1 = linker_symbol_addr!(guard) as u64; //ctx.x1  is old return address
+            available.ctx.nx1 = linker_symbol_addr!(f) as u64; //ctx.nx2 is new return address
             available.ctx.x2 = s_ptr as u64; //cxt.x2 is sp
         }
         available.state = State::Ready;

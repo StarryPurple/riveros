@@ -1,5 +1,12 @@
 #![no_std]
 
+#[macro_export]
+macro_rules! linker_symbol_addr {
+    ($symbol:path) => {
+        ($symbol as *const ()).addr()
+    };
+}
+
 #[macro_use]
 pub mod console;
 mod file;

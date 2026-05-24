@@ -103,7 +103,7 @@ pub fn init_frame_allocator() {
         safe fn ekernel();
     }
     FRAME_ALLOCATOR.exclusive_access().init(
-        PhysAddr::from(ekernel as usize).ceil(),
+        PhysAddr::from(linker_symbol_addr!(ekernel)).ceil(),
         PhysAddr::from(MEMORY_END).floor(),
     );
 }

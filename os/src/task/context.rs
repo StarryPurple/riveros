@@ -17,7 +17,7 @@ impl TaskContext {
     }
     pub fn goto_trap_return(kstack_ptr: usize) -> Self {
         Self {
-            ra: trap_return as usize,
+            ra: linker_symbol_addr!(trap_return),
             sp: kstack_ptr,
             s: [0; 12],
         }

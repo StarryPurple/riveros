@@ -23,10 +23,11 @@ fn set_kernel_trap_entry() {
         unsafe fn __alltraps();
         unsafe fn __alltraps_k();
     }
-    let __alltraps_k_va = __alltraps_k as usize - __alltraps as usize + TRAMPOLINE;
+    let __alltraps_k_va =
+        linker_symbol_addr!(__alltraps_k) - linker_symbol_addr!(__alltraps) + TRAMPOLINE;
     unsafe {
         stvec::write(stvec::Stvec::new(__alltraps_k_va, TrapMode::Direct));
-        sscratch::write(trap_from_kernel as usize);
+        sscratch::write(linker_symbol_addr!(trap_from_kernel));
     }
 }
 
@@ -138,7 +139,7 @@ pub fn trap_return() -> ! {
         unsafe fn __alltraps();
         unsafe fn __restore();
     }
-    let restore_va = __restore as usize - __alltraps as usize + TRAMPOLINE;
+    let restore_va = linker_symbol_addr!(__restore) - linker_symbol_addr!(__alltraps) + TRAMPOLINE;
     //println!("before return");
     unsafe {
         asm!(

@@ -1,6 +1,12 @@
 #![no_std]
 #![no_main]
 
+macro_rules! linker_symbol_addr {
+    ($symbol:path) => {
+        ($symbol as *const ()).addr()
+    };
+}
+
 //use crate::drivers::{GPU_DEVICE, KEYBOARD_DEVICE, MOUSE_DEVICE, INPUT_CONDVAR};
 use crate::drivers::{GPU_DEVICE, KEYBOARD_DEVICE, MOUSE_DEVICE};
 extern crate alloc;
@@ -40,8 +46,11 @@ fn clear_bss() {
         safe fn ebss();
     }
     unsafe {
-        core::slice::from_raw_parts_mut(sbss as usize as *mut u8, ebss as usize - sbss as usize)
-            .fill(0);
+        core::slice::from_raw_parts_mut(
+            linker_symbol_addr!(sbss) as *mut u8,
+            linker_symbol_addr!(ebss) - linker_symbol_addr!(sbss),
+        )
+        .fill(0);
     }
 }
 
