@@ -4,10 +4,11 @@ pub const MEMORY_END: usize = 0x8800_0000;
 pub const CXL_SIM_SLOW_MEMORY_START: usize = 0x8600_0000;
 
 pub const MMIO: &[(usize, usize)] = &[
-    (0x0010_0000, 0x00_2000), // VIRT_TEST/RTC  in virt machine
-    (0x2000000, 0x10000),     // core local interrupter (CLINT)
-    (0xc000000, 0x210000),    // VIRT_PLIC in virt machine
-    (0x10000000, 0x9000),     // VIRT_UART0 with GPU  in virt machine
+    (0x0010_0000, 0x00_2000),     // VIRT_TEST/RTC  in virt machine
+    (0x2000000, 0x10000),         // core local interrupter (CLINT)
+    (0xc000000, 0x210000),        // VIRT_PLIC in virt machine
+    (0x10000000, 0x9000),         // VIRT_UART0 with GPU  in virt machine
+    (0x30000000, 0x1000000 * 16), // PCIe ECAM (bus 0~15, 16MB)
 ];
 
 pub type BlockDeviceImpl = crate::drivers::block::VirtIOBlock;

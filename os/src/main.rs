@@ -79,6 +79,15 @@ pub fn rust_main() -> ! {
     trap::enable_timer_interrupt();
     timer::set_next_trigger();
     board::device_init();
+    use drivers::bus::pci::{pci_scan, is_cxl_type3};
+    let pci_devices = pci_scan();
+    let pci_count = pci_devices.len();
+    let cxl_count = pci_devices.iter().filter(|d| is_cxl_type3(d)).count();
+    println!("PCI: {} device(s) found, {} CXL Type 3", pci_count, cxl_count);
+    for dev in &pci_devices {
+        println!("  {:02x}:{:02x}.{:01x} {:04x}:{:04x} class={:#04x}",
+            dev.bus, dev.dev, dev.func, dev.vendor_id, dev.device_id, dev.class_code);
+    }
     fs::list_apps();
     task::add_initproc();
     *DEV_NON_BLOCKING_ACCESS.exclusive_access() = true;

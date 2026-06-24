@@ -1,10 +1,12 @@
 use super::{PhysAddr, PhysPageNum};
 use crate::config::{CXL_SIM_SLOW_MEMORY_START, MEMORY_END};
+use crate::drivers::pci::PciDevice;
 use crate::sync::UPIntrFreeCell;
 use alloc::vec::Vec;
 use core::fmt::{self, Debug, Formatter};
 use core::ops::Range;
 use lazy_static::*;
+use crate::drivers::bus::pci::{pci_scan, is_cxl_type3};
 
 pub struct FrameTracker {
     pub ppn: PhysPageNum,
@@ -185,10 +187,24 @@ pub fn init_frame_allocator() {
         PhysAddr::from(linker_symbol_addr!(ekernel)).ceil(),
         PhysAddr::from(CXL_SIM_SLOW_MEMORY_START).floor(),
     );
-    FRAME_ALLOCATOR.exclusive_access().add_slow(
+    let cxl_devices: Vec<PciDevice> = pci_scan().into_iter().filter(|d| is_cxl_type3(d)).collect();
+    if !cxl_devices.is_empty() {
+        for dev in cxl_devices {
+            let bar = dev.bars[0];
+            if let Some((base, size)) = bar {
+                println_cxl!("CXL Type3 at {:#x}-{:#x}", base, base + size);
+                FRAME_ALLOCATOR.exclusive_access().add_slow(
+                  PhysAddr::from(base as usize).ceil(),
+                  PhysAddr::from((base + size) as usize).floor()
+                );
+            }
+        }
+    } else {
+      FRAME_ALLOCATOR.exclusive_access().add_slow(
         PhysAddr::from(CXL_SIM_SLOW_MEMORY_START).ceil(),
         PhysAddr::from(MEMORY_END).floor(),
-    );
+      );
+    }
 }
 
 #[allow(unused)]
