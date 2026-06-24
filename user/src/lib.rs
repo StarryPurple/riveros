@@ -16,6 +16,7 @@ mod net;
 mod sync;
 mod syscall;
 mod task;
+mod cxl;
 
 extern crate alloc;
 #[macro_use]
@@ -31,6 +32,7 @@ pub use net::*;
 pub use sync::*;
 use syscall::*;
 pub use task::*;
+pub use cxl::*;
 
 unsafe extern "Rust" {
     fn main(argc: usize, argv: &[&str]) -> i32;

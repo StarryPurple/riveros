@@ -1,8 +1,8 @@
-use super::{FrameTracker, frame_alloc};
+use super::{FrameTracker, frame_alloc, frame_alloc_slow};
 use super::{PTEFlags, PageTable, PageTableEntry};
 use super::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum};
 use super::{StepByOne, VPNRange};
-use crate::config::{MEMORY_END, MMIO, PAGE_SIZE, TRAMPOLINE};
+use crate::config::{MEMORY_END, MMIO, PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT_BASE};
 use crate::sync::UPIntrFreeCell;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
@@ -246,11 +246,34 @@ impl MemorySet {
         self.areas.clear();
     }
     pub fn forget_frame(&mut self, vpn: VirtPageNum) {
-      if let Some(area) = self.areas.iter_mut().find(|area| area.vpn_range.contains(&vpn)) {
-        if let Some(old_frame) = area.data_frames.remove(&vpn) {
-          core::mem::forget(old_frame); // do not trigger frame_dealloc: managed in page migrator
+        if let Some(area) = self
+            .areas
+            .iter_mut()
+            .find(|area| area.vpn_range.contains(&vpn))
+        {
+            if let Some(old_frame) = area.data_frames.remove(&vpn) {
+                core::mem::forget(old_frame); // do not trigger frame_dealloc: managed in page migrator
+            }
         }
-      }
+    }
+    pub fn find_mmap_base(&self, page_count: usize) -> Option<VirtAddr> {
+        let mut sorted: Vec<&MapArea> = self.areas.iter().collect();
+        sorted.sort_by_key(|area| area.vpn_range.get_start());
+        let mut candidate = VirtAddr::from(0x1).ceil(); // 0x0 reserved
+        for area in &sorted {
+            let start = area.vpn_range.get_start();
+            if candidate.0 + page_count <= start.0 {
+                println_cxl!("candidate page: {:#x}", candidate.0);
+                return Some(VirtAddr::from(candidate));
+            }
+            let end: VirtPageNum = area.vpn_range.get_end();
+            candidate = candidate.max(end);
+        }
+        if candidate.0 + page_count >= VirtAddr(TRAP_CONTEXT_BASE).ceil().into() {
+            None
+        } else {
+            Some(VirtAddr::from(candidate))
+        }
     }
 }
 
@@ -293,6 +316,11 @@ impl MapArea {
             }
             MapType::Framed => {
                 let frame = frame_alloc().unwrap();
+                ppn = frame.ppn;
+                self.data_frames.insert(vpn, frame);
+            }
+            MapType::FramedSlow => {
+                let frame = frame_alloc_slow().unwrap();
                 ppn = frame.ppn;
                 self.data_frames.insert(vpn, frame);
             }
@@ -349,6 +377,7 @@ impl MapArea {
 pub enum MapType {
     Identical,
     Framed,
+    FramedSlow,
     /// offset of page num
     Linear(isize),
 }

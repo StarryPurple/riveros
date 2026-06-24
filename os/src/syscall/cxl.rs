@@ -3,6 +3,21 @@ use crate::mm::PAGE_MIGRATOR;
 use crate::task::current_user_token;
 use crate::mm::translated_refmut;
 use core::mem::size_of;
+use crate::task::current_process;
+use crate::config::PAGE_SIZE;
+use crate::mm::{MemorySet, MapArea, MapType, MapPermission};
+use crate::mm::VirtAddr;
+
+/// `slow_count`: the number of slow memory pages to map
+pub fn sys_cxl_mmap(slow_count: usize) -> isize {
+  let process = current_process();
+  let mut inner = process.inner_exclusive_access();
+  let start_va = inner.memory_set.find_mmap_base(slow_count).unwrap();
+  let end_va: VirtAddr = (start_va.0 + slow_count * PAGE_SIZE).into();
+  let area = MapArea::new(start_va, end_va, MapType::FramedSlow, MapPermission::R | MapPermission::W | MapPermission::U);
+  inner.memory_set.push(area, None);
+  start_va.0 as isize
+}
 
 #[repr(C)]
 pub struct CxlMemInfo {
@@ -33,6 +48,6 @@ pub fn sys_cxl_meminfo(buf: *mut CxlMemInfo) -> isize {
     let mig = PAGE_MIGRATOR.exclusive_access();
     info.promote_count = mig.promote_count;
     info.demote_count = mig.demote_count;
-    
+
     0
 }

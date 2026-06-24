@@ -32,6 +32,8 @@ const SYSCALL_FRAMEBUFFER: usize = 2000;
 const SYSCALL_FRAMEBUFFER_FLUSH: usize = 2001;
 const SYSCALL_EVENT_GET: usize = 3000;
 const SYSCALL_KEY_PRESSED: usize = 3001;
+const SYSCALL_CXL_MEMINFO: usize = 4000;
+const SYSCALL_CXL_MMAP: usize = 4001;
 
 fn syscall(id: usize, args: [usize; 3]) -> isize {
     let mut ret: isize;
@@ -192,4 +194,12 @@ pub fn sys_event_get() -> isize {
 
 pub fn sys_key_pressed() -> isize {
     syscall(SYSCALL_KEY_PRESSED, [0, 0, 0])
+}
+
+pub fn sys_cxl_meminfo(buf: *mut u8) -> isize {
+    syscall(SYSCALL_CXL_MEMINFO, [buf as usize, 0, 0])
+}
+
+pub fn sys_cxl_mmap(slow_count: usize) -> isize {
+    syscall(SYSCALL_CXL_MMAP, [slow_count, 0, 0])
 }

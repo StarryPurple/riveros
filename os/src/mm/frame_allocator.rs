@@ -233,6 +233,13 @@ pub fn frame_alloc() -> Option<FrameTracker> {
         .map(FrameTracker::new)
 }
 
+pub fn frame_alloc_slow() -> Option<FrameTracker> {
+    FRAME_ALLOCATOR
+        .exclusive_access()
+        .alloc_slow()
+        .map(FrameTracker::new)
+}
+
 pub fn frame_alloc_more(num: usize) -> Option<Vec<FrameTracker>> {
     FRAME_ALLOCATOR
         .exclusive_access()
