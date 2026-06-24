@@ -8,6 +8,7 @@ use crate::task::{
     suspend_current_and_run_next,
 };
 use crate::timer::{check_timer, set_next_trigger};
+use crate::mm::PAGE_MIGRATOR;
 use core::arch::{asm, global_asm};
 use riscv::interrupt::{Exception, Interrupt, Trap};
 use riscv::register::{mtvec::TrapMode, scause, sie, sscratch, sstatus, stval, stvec};
@@ -105,6 +106,7 @@ pub fn trap_handler() -> ! {
         Trap::Interrupt(Interrupt::SupervisorTimer) => {
             set_next_trigger();
             check_timer();
+            PAGE_MIGRATOR.exclusive_access().tick();
             suspend_current_and_run_next();
         }
         Trap::Interrupt(Interrupt::SupervisorExternal) => {

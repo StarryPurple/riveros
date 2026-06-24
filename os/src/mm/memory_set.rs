@@ -245,6 +245,13 @@ impl MemorySet {
         //*self = Self::new_bare();
         self.areas.clear();
     }
+    pub fn forget_frame(&mut self, vpn: VirtPageNum) {
+      if let Some(area) = self.areas.iter_mut().find(|area| area.vpn_range.contains(&vpn)) {
+        if let Some(old_frame) = area.data_frames.remove(&vpn) {
+          core::mem::forget(old_frame); // do not trigger frame_dealloc: managed in page migrator
+        }
+      }
+    }
 }
 
 pub struct MapArea {

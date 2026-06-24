@@ -3,6 +3,7 @@ mod frame_allocator;
 mod heap_allocator;
 mod memory_set;
 mod page_table;
+mod page_migrator;
 
 pub use address::VPNRange;
 pub use address::{PhysAddr, PhysPageNum, StepByOne, VirtAddr, VirtPageNum};
@@ -13,9 +14,11 @@ pub use page_table::{
     PageTable, PageTableEntry, UserBuffer, translated_byte_buffer, translated_ref,
     translated_refmut, translated_str,
 };
+pub use page_migrator::PAGE_MIGRATOR;
 
 pub fn init() {
     heap_allocator::init_heap();
     frame_allocator::init_frame_allocator();
     KERNEL_SPACE.exclusive_access().activate();
+    // frame_allocator::tier_alloc_test();
 }

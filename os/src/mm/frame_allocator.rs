@@ -1,8 +1,9 @@
 use super::{PhysAddr, PhysPageNum};
-use crate::config::MEMORY_END;
+use crate::config::{CXL_SIM_SLOW_MEMORY_START, MEMORY_END};
 use crate::sync::UPIntrFreeCell;
 use alloc::vec::Vec;
 use core::fmt::{self, Debug, Formatter};
+use core::ops::Range;
 use lazy_static::*;
 
 pub struct FrameTracker {
@@ -32,14 +33,8 @@ impl Drop for FrameTracker {
     }
 }
 
-trait FrameAllocator {
-    fn new() -> Self;
-    fn alloc(&mut self) -> Option<PhysPageNum>;
-    fn alloc_more(&mut self, pages: usize) -> Option<Vec<PhysPageNum>>;
-    fn dealloc(&mut self, ppn: PhysPageNum);
-}
-
 pub struct StackFrameAllocator {
+    start: usize,
     current: usize,
     end: usize,
     recycled: Vec<usize>,
@@ -47,20 +42,23 @@ pub struct StackFrameAllocator {
 
 impl StackFrameAllocator {
     pub fn init(&mut self, l: PhysPageNum, r: PhysPageNum) {
+        self.start = l.0;
         self.current = l.0;
         self.end = r.0;
-        // println!("last {} Physical Frames.", self.end - self.current);
+        // println!("last {} Physical Frames.", self.end - self.start);
     }
-}
-impl FrameAllocator for StackFrameAllocator {
-    fn new() -> Self {
+    pub fn stack_range(&self) -> Range<PhysPageNum> {
+        (self.start.into())..(self.end.into())
+    }
+    pub fn new() -> Self {
         Self {
+            start: 0,
             current: 0,
             end: 0,
             recycled: Vec::new(),
         }
     }
-    fn alloc(&mut self) -> Option<PhysPageNum> {
+    pub fn alloc(&mut self) -> Option<PhysPageNum> {
         if let Some(ppn) = self.recycled.pop() {
             Some(ppn.into())
         } else if self.current == self.end {
@@ -70,7 +68,8 @@ impl FrameAllocator for StackFrameAllocator {
             Some((self.current - 1).into())
         }
     }
-    fn alloc_more(&mut self, pages: usize) -> Option<Vec<PhysPageNum>> {
+    #[allow(unused)]
+    pub fn alloc_more(&mut self, pages: usize) -> Option<Vec<PhysPageNum>> {
         if self.current + pages >= self.end {
             None
         } else {
@@ -80,7 +79,7 @@ impl FrameAllocator for StackFrameAllocator {
             Some(v)
         }
     }
-    fn dealloc(&mut self, ppn: PhysPageNum) {
+    pub fn dealloc(&mut self, ppn: PhysPageNum) {
         let ppn = ppn.0;
         // validity check
         if ppn >= self.current || self.recycled.iter().any(|&v| v == ppn) {
@@ -91,7 +90,87 @@ impl FrameAllocator for StackFrameAllocator {
     }
 }
 
-type FrameAllocatorImpl = StackFrameAllocator;
+#[derive(Debug)]
+pub enum MemoryTier {
+    Fast,
+    Slow,
+}
+
+pub struct TieredFrameAllocator {
+    fast: StackFrameAllocator,
+    slow: Option<StackFrameAllocator>,
+}
+
+impl TieredFrameAllocator {
+    pub fn new() -> Self {
+        Self {
+            fast: StackFrameAllocator::new(),
+            slow: None,
+        }
+    }
+    /// Fast tier must be valid.
+    pub fn init(&mut self, l: PhysPageNum, r: PhysPageNum) {
+        self.fast.init(l, r);
+    }
+    pub fn add_slow(&mut self, l: PhysPageNum, r: PhysPageNum) {
+        let mut slow = StackFrameAllocator::new();
+        slow.init(l, r);
+        self.slow = Some(slow);
+    }
+    pub fn alloc_fast(&mut self) -> Option<PhysPageNum> {
+        self.fast.alloc()
+    }
+    pub fn alloc_slow(&mut self) -> Option<PhysPageNum> {
+        self.slow.as_mut()?.alloc()
+    }
+    /// Alloc from fast first, then fallback to slow.
+    pub fn alloc(&mut self) -> Option<PhysPageNum> {
+        self.alloc_fast().or_else(|| self.alloc_slow())
+    }
+    pub fn alloc_more(&mut self, pages: usize) -> Option<Vec<PhysPageNum>> {
+        let mut result = Vec::with_capacity(pages);
+        for _ in 0..pages {
+            match self.alloc() {
+                Some(ppn) => result.push(ppn),
+                None => {
+                    for ppn in result.iter() {
+                        self.dealloc(*ppn);
+                    }
+                    return None;
+                }
+            }
+        }
+        // sync with virtio.rs: return a decreasing order of ppns
+        result.reverse();
+        Some(result)
+    }
+    pub fn dealloc(&mut self, ppn: PhysPageNum) {
+        if self.fast.stack_range().contains(&ppn) {
+            self.fast.dealloc(ppn);
+            return;
+        } else if let Some(ref mut slow) = self.slow {
+            if slow.stack_range().contains(&ppn) {
+                slow.dealloc(ppn);
+                return;
+            }
+        }
+        panic!("Frame ppn={:#x} is not in fast or slow tier", ppn.0);
+    }
+    /// return None if this is a kernal page
+    pub fn page_tier(&self, ppn: PhysPageNum) -> Option<MemoryTier> {
+        if self.fast.stack_range().contains(&ppn) {
+            return Some(MemoryTier::Fast);
+        } else if let Some(ref slow) = self.slow {
+            if slow.stack_range().contains(&ppn) {
+                return Some(MemoryTier::Slow);
+            }
+        }
+        None
+    }
+}
+
+
+type FrameAllocatorImpl = TieredFrameAllocator;
 
 lazy_static! {
     pub static ref FRAME_ALLOCATOR: UPIntrFreeCell<FrameAllocatorImpl> =
@@ -104,8 +183,17 @@ pub fn init_frame_allocator() {
     }
     FRAME_ALLOCATOR.exclusive_access().init(
         PhysAddr::from(linker_symbol_addr!(ekernel)).ceil(),
+        PhysAddr::from(CXL_SIM_SLOW_MEMORY_START).floor(),
+    );
+    FRAME_ALLOCATOR.exclusive_access().add_slow(
+        PhysAddr::from(CXL_SIM_SLOW_MEMORY_START).ceil(),
         PhysAddr::from(MEMORY_END).floor(),
     );
+}
+
+#[allow(unused)]
+pub fn add_slow_frame_allocator(l: PhysPageNum, r: PhysPageNum) {
+    FRAME_ALLOCATOR.exclusive_access().add_slow(l, r);
 }
 
 pub fn frame_alloc() -> Option<FrameTracker> {
@@ -159,4 +247,15 @@ pub fn frame_allocator_alloc_more_test() {
     }
     drop(v);
     println!("frame_allocator_test passed!");
+}
+
+#[allow(unused)]
+pub fn tier_alloc_test() {
+    let slow = FRAME_ALLOCATOR.exclusive_access().alloc_slow().unwrap();
+    let tier = FRAME_ALLOCATOR.exclusive_access().page_tier(slow);
+    println!("[CXL] slow ppn={:#x}, tier={:?}", slow.0, tier);
+
+    let fast = FRAME_ALLOCATOR.exclusive_access().alloc_fast().unwrap();
+    let tier = FRAME_ALLOCATOR.exclusive_access().page_tier(fast);
+    println!("[CXL] fast ppn={:#x}, tier={:?}", fast.0, tier);
 }

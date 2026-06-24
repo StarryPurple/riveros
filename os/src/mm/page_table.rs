@@ -50,6 +50,18 @@ impl PageTableEntry {
     pub fn executable(&self) -> bool {
         (self.flags() & PTEFlags::X) != PTEFlags::empty()
     }
+    pub fn accessed(&self) -> bool {
+        (self.flags() & PTEFlags::A) != PTEFlags::empty()
+    }
+    pub fn dirty(&self) -> bool {
+        (self.flags() & PTEFlags::D) != PTEFlags::empty()
+    }
+    pub fn clear_accessed(&mut self) {
+        self.bits &= !(PTEFlags::A.bits as usize);
+    }
+    pub fn clear_dirty(&mut self) {
+        self.bits &= !(PTEFlags::D.bits as usize);
+    }
 }
 
 pub struct PageTable {
@@ -92,7 +104,7 @@ impl PageTable {
         }
         result
     }
-    fn find_pte(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
+    pub fn find_pte(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
         let idxs = vpn.indexes();
         let mut ppn = self.root_ppn;
         let mut result: Option<&mut PageTableEntry> = None;
@@ -134,6 +146,25 @@ impl PageTable {
     }
     pub fn token(&self) -> usize {
         8usize << 60 | self.root_ppn.0
+    }
+    pub fn collect_ptes(&self) -> Vec<(VirtPageNum, &mut PageTableEntry)> {
+        let mut result = Vec::new();
+        for i2 in 0..512 {
+          let pte2 = &self.root_ppn.get_pte_array()[i2];
+          if !pte2.is_valid() { continue; }
+          let ppn2 = pte2.ppn();
+          for i1 in 0..512 {
+            let pte1 = &ppn2.get_pte_array()[i1];
+            if !pte1.is_valid() { continue; }
+            let ppn1 = pte1.ppn();
+            for i0 in 0..512 {
+              let pte0 = &mut ppn1.get_pte_array()[i0];
+              if !pte0.is_valid() { continue; }
+              result.push((VirtPageNum((i2 << 18) | (i1 << 9) | i0), pte0));
+            }
+          }
+        }
+        result
     }
 }
 

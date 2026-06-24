@@ -60,3 +60,14 @@ pub fn remove_from_pid2process(pid: usize) {
         panic!("cannot find pid {} in pid2task!", pid);
     }
 }
+
+/// Iterate over all processes. TLB update at page migration needs it.
+pub fn for_each_process<F>(mut f: F)
+where
+    F: FnMut(&Arc<ProcessControlBlock>),
+{
+    let map = PID2PCB.exclusive_access();
+    for (_, proc) in map.iter() {
+        f(proc);
+    }
+}
