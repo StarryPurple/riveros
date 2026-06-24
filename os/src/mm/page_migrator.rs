@@ -15,6 +15,10 @@ pub struct PageMigrator {
     scan_interval_ms: usize,
     cold_threshold: u8,
     last_scan_ms: usize,
+
+    /// Statistics
+    pub promote_count: u64,
+    pub demote_count: u64,
 }
 
 impl PageMigrator {
@@ -24,6 +28,8 @@ impl PageMigrator {
             scan_interval_ms: 500,
             cold_threshold: 3,
             last_scan_ms: 0,
+            promote_count: 0,
+            demote_count: 0,
         }
     }
     pub fn tick(&mut self) {
@@ -46,6 +52,7 @@ impl PageMigrator {
                         if *count >= self.cold_threshold {
                             self.demote_page(ppn, vpn, &page_table, token);
                             self.cold_count.remove(&ppn);
+                            break;
                         }
                     } else {
                         self.cold_count.remove(&ppn);
@@ -73,6 +80,7 @@ impl PageMigrator {
         _page_table: &PageTable,
         _token: usize,
     ) {
+        self.promote_count += 1;
         let new_ppn = FRAME_ALLOCATOR.exclusive_access().alloc_fast().unwrap();
         let src = old_ppn.get_bytes_array();
         let dst = new_ppn.get_bytes_array();
@@ -95,6 +103,7 @@ impl PageMigrator {
         _page_table: &PageTable,
         _token: usize,
     ) {
+        self.demote_count += 1;
         let new_ppn = FRAME_ALLOCATOR.exclusive_access().alloc_slow().unwrap();
         let src = old_ppn.get_bytes_array();
         let dst = new_ppn.get_bytes_array();

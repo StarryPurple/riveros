@@ -32,6 +32,7 @@ const SYSCALL_FRAMEBUFFER: usize = 2000;
 const SYSCALL_FRAMEBUFFER_FLUSH: usize = 2001;
 const SYSCALL_EVENT_GET: usize = 3000;
 const SYSCALL_KEY_PRESSED: usize = 3001;
+const SYSCALL_CXL_MEMINFO: usize = 4000;
 
 mod fs;
 mod gui;
@@ -40,6 +41,7 @@ mod net;
 mod process;
 mod sync;
 mod thread;
+mod cxl;
 
 use fs::*;
 use gui::*;
@@ -48,7 +50,7 @@ use net::*;
 use process::*;
 use sync::*;
 use thread::*;
-
+use cxl::*;
 pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
     match syscall_id {
         SYSCALL_DUP => sys_dup(args[0]),
@@ -85,6 +87,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         SYSCALL_FRAMEBUFFER_FLUSH => sys_framebuffer_flush(),
         SYSCALL_EVENT_GET => sys_event_get(),
         SYSCALL_KEY_PRESSED => sys_key_pressed(),
+        SYSCALL_CXL_MEMINFO => sys_cxl_meminfo(args[0] as *mut CxlMemInfo),
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     }
 }

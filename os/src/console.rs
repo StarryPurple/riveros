@@ -34,6 +34,6 @@ macro_rules! println {
 #[macro_export]
 macro_rules! println_cxl {
     ($fmt: literal $(, $($arg: tt)+)?) => {
-        $crate::console::print(format_args!(concat!("[CXL] ", $fmt, "\n") $(, $($arg)+)?))
+        // $crate::console::print(format_args!(concat!("[CXL] ", $fmt, "\n") $(, $($arg)+)?))
     }
 }

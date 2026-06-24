@@ -101,6 +101,12 @@ pub enum MemoryTier {
 pub struct TieredFrameAllocator {
     fast: StackFrameAllocator,
     slow: Option<StackFrameAllocator>,
+
+    /// Statistics
+    pub fast_alloc_count: u64,
+    pub slow_alloc_count: u64,
+    pub fast_dealloc_count: u64,
+    pub slow_dealloc_count: u64,
 }
 
 impl TieredFrameAllocator {
@@ -108,6 +114,10 @@ impl TieredFrameAllocator {
         Self {
             fast: StackFrameAllocator::new(),
             slow: None,
+            fast_alloc_count: 0,
+            slow_alloc_count: 0,
+            fast_dealloc_count: 0,
+            slow_dealloc_count: 0,
         }
     }
     /// Fast tier must be valid.
@@ -120,9 +130,11 @@ impl TieredFrameAllocator {
         self.slow = Some(slow);
     }
     pub fn alloc_fast(&mut self) -> Option<PhysPageNum> {
+        self.fast_alloc_count += 1;
         self.fast.alloc()
     }
     pub fn alloc_slow(&mut self) -> Option<PhysPageNum> {
+        self.slow_alloc_count += 1;
         self.slow.as_mut()?.alloc()
     }
     /// Alloc from fast first, then fallback to slow.
@@ -148,10 +160,12 @@ impl TieredFrameAllocator {
     }
     pub fn dealloc(&mut self, ppn: PhysPageNum) {
         if self.fast.stack_range().contains(&ppn) {
+            self.fast_dealloc_count += 1;
             self.fast.dealloc(ppn);
             return;
         } else if let Some(ref mut slow) = self.slow {
             if slow.stack_range().contains(&ppn) {
+                self.slow_dealloc_count += 1;
                 slow.dealloc(ppn);
                 return;
             }
