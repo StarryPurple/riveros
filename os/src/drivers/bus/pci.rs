@@ -114,7 +114,7 @@ impl PciDevice {
 
 pub fn pci_scan() -> Vec<PciDevice> {
     let mut devices = Vec::new();
-    for bus in 0..=12 {
+    for bus in 0..=255 {
         for dev in 0..=31 {
             for func in 0..=7 {
                 if let Some(d) = PciDevice::try_new(bus, dev, func) {

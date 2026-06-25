@@ -34,6 +34,7 @@ const SYSCALL_EVENT_GET: usize = 3000;
 const SYSCALL_KEY_PRESSED: usize = 3001;
 const SYSCALL_CXL_MEMINFO: usize = 4000;
 const SYSCALL_CXL_MMAP: usize = 4001;
+const SYSCALL_CXL_MUNMAP: usize = 4002;
 
 mod fs;
 mod gui;
@@ -90,6 +91,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         SYSCALL_KEY_PRESSED => sys_key_pressed(),
         SYSCALL_CXL_MEMINFO => sys_cxl_meminfo(args[0] as *mut CxlMemInfo),
         SYSCALL_CXL_MMAP => sys_cxl_mmap(args[0]),
+        SYSCALL_CXL_MUNMAP => sys_cxl_munmap(args[0], args[1]),
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     }
 }

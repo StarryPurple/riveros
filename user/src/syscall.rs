@@ -34,6 +34,7 @@ const SYSCALL_EVENT_GET: usize = 3000;
 const SYSCALL_KEY_PRESSED: usize = 3001;
 const SYSCALL_CXL_MEMINFO: usize = 4000;
 const SYSCALL_CXL_MMAP: usize = 4001;
+const SYSCALL_CXL_MUNMAP: usize = 4002;
 
 fn syscall(id: usize, args: [usize; 3]) -> isize {
     let mut ret: isize;
@@ -202,4 +203,8 @@ pub fn sys_cxl_meminfo(buf: *mut u8) -> isize {
 
 pub fn sys_cxl_mmap(slow_count: usize) -> isize {
     syscall(SYSCALL_CXL_MMAP, [slow_count, 0, 0])
+}
+
+pub fn sys_cxl_munmap(ptr: usize, _count: usize) -> isize {
+    syscall(SYSCALL_CXL_MUNMAP, [ptr, 0, 0])
 }

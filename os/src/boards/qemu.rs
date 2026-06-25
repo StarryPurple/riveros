@@ -8,7 +8,7 @@ pub const MMIO: &[(usize, usize)] = &[
     (0x2000000, 0x10000),         // core local interrupter (CLINT)
     (0xc000000, 0x210000),        // VIRT_PLIC in virt machine
     (0x10000000, 0x9000),         // VIRT_UART0 with GPU  in virt machine
-    (0x30000000, 0x1000000 * 16), // PCIe ECAM (bus 0~15, 16MB)
+    (0x30000000, 0x10000000),     // PCIe ECAM (256 MB, all buses)
 ];
 
 pub type BlockDeviceImpl = crate::drivers::block::VirtIOBlock;

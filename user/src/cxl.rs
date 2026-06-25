@@ -21,3 +21,7 @@ pub fn query_cxl_meminfo(info: &mut CxlMemInfo) -> isize {
 pub fn cxl_mmap(slow_count: usize) -> isize {
     sys_cxl_mmap(slow_count)
 }
+
+pub fn cxl_munmap(ptr: usize, _count: usize) -> isize {
+    sys_cxl_munmap(ptr, _count)
+}

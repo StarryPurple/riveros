@@ -60,7 +60,7 @@ impl MemorySet {
             None,
         );
     }
-    pub fn remove_area_with_start_vpn(&mut self, start_vpn: VirtPageNum) {
+    pub fn remove_area_with_start_vpn(&mut self, start_vpn: VirtPageNum) -> bool {
         if let Some((idx, area)) = self
             .areas
             .iter_mut()
@@ -69,6 +69,9 @@ impl MemorySet {
         {
             area.unmap(&mut self.page_table);
             self.areas.remove(idx);
+            true
+        } else {
+          false
         }
     }
     /// Add a new MapArea into this MemorySet.

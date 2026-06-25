@@ -6,7 +6,7 @@ extern crate user_lib;
 extern crate alloc;
 extern crate core;
 
-use user_lib::{CxlMemInfo, query_cxl_meminfo, cxl_mmap};
+use user_lib::{CxlMemInfo, query_cxl_meminfo, cxl_mmap, cxl_munmap};
 
 #[unsafe(no_mangle)]
 pub fn main() -> i32 {
@@ -31,8 +31,12 @@ pub fn main() -> i32 {
     query_cxl_meminfo(&mut cxl_meminfo);
     let end_slow_alloc_count = cxl_meminfo.slow_alloc_count;
     let delta = end_slow_alloc_count - start_slow_alloc_count;
+    println!("cxl info:{:?}", cxl_meminfo);
     println!("cxl slow alloc delta = {}", delta);
     // might be more than N due to page migration, but very very unlikely (they're frequently accessed)
     assert!(delta >= N as u64);
+    cxl_munmap(ptr as usize, N);
+    query_cxl_meminfo(&mut cxl_meminfo);
+    println!("cxl info:{:?}", cxl_meminfo);
     0
 }

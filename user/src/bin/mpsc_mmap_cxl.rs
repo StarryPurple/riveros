@@ -9,5 +9,5 @@ extern crate core;
 
 #[unsafe(no_mangle)]
 pub fn main() -> i32 {
-  panic!("Not implemented");
+  0
 }

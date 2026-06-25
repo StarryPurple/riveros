@@ -19,6 +19,14 @@ pub fn sys_cxl_mmap(slow_count: usize) -> isize {
   start_va.0 as isize
 }
 
+/// Requires to release the whole mapped area. No like Linux.
+pub fn sys_cxl_munmap(ptr: usize, _count: usize) -> isize {
+  let process = current_process();
+  let mut inner = process.inner_exclusive_access();
+  inner.memory_set.remove_area_with_start_vpn(ptr.into());
+  0
+}
+
 #[repr(C)]
 pub struct CxlMemInfo {
     pub version: u32, // reserved for this struct
