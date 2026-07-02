@@ -2,7 +2,7 @@ use super::{FrameTracker, frame_alloc, frame_alloc_slow};
 use super::{PTEFlags, PageTable, PageTableEntry};
 use super::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum};
 use super::{StepByOne, VPNRange};
-use crate::config::{MEMORY_END, MMIO, PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT_BASE};
+use crate::config::{CXL_RESERVED_MEMORY_START, MEMORY_END, MMIO, PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT_BASE};
 use crate::sync::UPIntrFreeCell;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
@@ -262,11 +262,11 @@ impl MemorySet {
     pub fn find_mmap_base(&self, page_count: usize) -> Option<VirtAddr> {
         let mut sorted: Vec<&MapArea> = self.areas.iter().collect();
         sorted.sort_by_key(|area| area.vpn_range.get_start());
-        let mut candidate = VirtAddr::from(0x1).ceil(); // 0x0 reserved
+        let mut candidate = VirtAddr::from(CXL_RESERVED_MEMORY_START).ceil(); // 0x0 reserved
         for area in &sorted {
             let start = area.vpn_range.get_start();
             if candidate.0 + page_count <= start.0 {
-                println_cxl!("candidate page: {:#x}", candidate.0);
+                // println_cxl!("candidate page: {:#x}", candidate.0);
                 return Some(VirtAddr::from(candidate));
             }
             let end: VirtPageNum = area.vpn_range.get_end();

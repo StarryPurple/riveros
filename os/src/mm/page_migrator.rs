@@ -1,6 +1,6 @@
 use super::frame_allocator::{FRAME_ALLOCATOR, MemoryTier};
 use super::page_table::{PageTable, PageTableEntry};
-use super::{PhysPageNum, VirtPageNum, frame_dealloc};
+use super::{PhysPageNum, VirtPageNum, frame_dealloc, copy_page};
 use crate::task::current_process;
 use crate::timer::get_time_ms;
 use alloc::collections::BTreeMap;
@@ -82,14 +82,12 @@ impl PageMigrator {
     ) {
         self.promote_count += 1;
         let new_ppn = FRAME_ALLOCATOR.exclusive_access().alloc_fast().unwrap();
-        let src = old_ppn.get_bytes_array();
-        let dst = new_ppn.get_bytes_array();
-        dst.copy_from_slice(src);
+        copy_page(old_ppn, new_ppn);
         self.replace_ppn(old_ppn, new_ppn);
         unsafe {
             asm!("sfence.vma");
         }
-        println_cxl!("promote_page: old_ppn={:#x}, new_ppn={:#x}", old_ppn.0, new_ppn.0);
+        // println_cxl!("promote_page: old_ppn={:#x}, new_ppn={:#x}", old_ppn.0, new_ppn.0);
         frame_dealloc(old_ppn);
         if let Some(count) = self.cold_count.remove(&old_ppn) {
             self.cold_count.insert(new_ppn, count);
@@ -105,14 +103,12 @@ impl PageMigrator {
     ) {
         self.demote_count += 1;
         let new_ppn = FRAME_ALLOCATOR.exclusive_access().alloc_slow().unwrap();
-        let src = old_ppn.get_bytes_array();
-        let dst = new_ppn.get_bytes_array();
-        dst.copy_from_slice(src);
+        copy_page(old_ppn, new_ppn);
         self.replace_ppn(old_ppn, new_ppn);
         unsafe {
             asm!("sfence.vma");
         }
-        println_cxl!("demote_page: old_ppn={:#x}, new_ppn={:#x}", old_ppn.0, new_ppn.0);
+        // println_cxl!("demote_page: old_ppn={:#x}, new_ppn={:#x}", old_ppn.0, new_ppn.0);
         frame_dealloc(old_ppn);
         if let Some(count) = self.cold_count.remove(&old_ppn) {
             self.cold_count.insert(new_ppn, count);

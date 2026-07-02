@@ -85,14 +85,21 @@ impl StackFrameAllocator {
         let ppn = ppn.0;
         // validity check
         if ppn >= self.current || self.recycled.iter().any(|&v| v == ppn) {
-            panic!("Frame ppn={:#x} has not been allocated!", ppn);
+            let ra: usize;
+            let frame_ra: usize;
+            unsafe {
+                core::arch::asm!("mv {}, ra", out(reg) ra);
+                core::arch::asm!("ld {}, 8(sp)", out(reg) frame_ra);
+            }
+            panic!("Frame ppn={:#x} not alloc! cur={:#x} recycled={} ra={:#x} f_ra={:#x}",
+                ppn, self.current, self.recycled.iter().any(|&v| v == ppn), ra, frame_ra);
         }
         // recycle
         self.recycled.push(ppn);
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum MemoryTier {
     Fast,
     Slow,

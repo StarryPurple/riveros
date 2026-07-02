@@ -8,19 +8,20 @@ use crate::config::PAGE_SIZE;
 use crate::mm::{MemorySet, MapArea, MapType, MapPermission};
 use crate::mm::VirtAddr;
 
-/// `slow_count`: the number of slow memory pages to map
-pub fn sys_cxl_mmap(slow_count: usize) -> isize {
+/// `size`: the size of the memory to map
+pub fn sys_cxl_mmap(size: usize) -> isize {
+  let page_count = (size + PAGE_SIZE - 1) / PAGE_SIZE;
   let process = current_process();
   let mut inner = process.inner_exclusive_access();
-  let start_va = inner.memory_set.find_mmap_base(slow_count).unwrap();
-  let end_va: VirtAddr = (start_va.0 + slow_count * PAGE_SIZE).into();
+  let start_va = inner.memory_set.find_mmap_base(page_count).unwrap();
+  let end_va: VirtAddr = (start_va.0 + page_count * PAGE_SIZE).into();
   let area = MapArea::new(start_va, end_va, MapType::FramedSlow, MapPermission::R | MapPermission::W | MapPermission::U);
   inner.memory_set.push(area, None);
   start_va.0 as isize
 }
 
-/// Requires to release the whole mapped area. No like Linux.
-pub fn sys_cxl_munmap(ptr: usize, _count: usize) -> isize {
+/// Requires to release the whole mapped area. Not like Linux.
+pub fn sys_cxl_munmap(ptr: usize, _size: usize) -> isize {
   let process = current_process();
   let mut inner = process.inner_exclusive_access();
   inner.memory_set.remove_area_with_start_vpn(ptr.into());

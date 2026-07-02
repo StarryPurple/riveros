@@ -201,10 +201,10 @@ pub fn sys_cxl_meminfo(buf: *mut u8) -> isize {
     syscall(SYSCALL_CXL_MEMINFO, [buf as usize, 0, 0])
 }
 
-pub fn sys_cxl_mmap(slow_count: usize) -> isize {
-    syscall(SYSCALL_CXL_MMAP, [slow_count, 0, 0])
+pub fn sys_cxl_mmap(size: usize) -> isize {
+    syscall(SYSCALL_CXL_MMAP, [size, 0, 0])
 }
 
-pub fn sys_cxl_munmap(ptr: usize, _count: usize) -> isize {
-    syscall(SYSCALL_CXL_MUNMAP, [ptr, 0, 0])
+pub fn sys_cxl_munmap(ptr: usize, size: usize) -> isize {
+    syscall(SYSCALL_CXL_MUNMAP, [ptr, size, 0])
 }

@@ -18,10 +18,10 @@ pub fn query_cxl_meminfo(info: &mut CxlMemInfo) -> isize {
     sys_cxl_meminfo(info as *mut _ as *mut u8)
 }
 
-pub fn cxl_mmap(slow_count: usize) -> isize {
-    sys_cxl_mmap(slow_count)
+pub fn cxl_mmap(size: usize) -> isize {
+    sys_cxl_mmap(size)
 }
 
-pub fn cxl_munmap(ptr: usize, _count: usize) -> isize {
-    sys_cxl_munmap(ptr, _count)
+pub fn cxl_munmap(ptr: usize, size: usize) -> isize {
+    sys_cxl_munmap(ptr, size)
 }

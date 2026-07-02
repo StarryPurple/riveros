@@ -39,6 +39,7 @@ static SUCC_TESTS: &[(&str, &str, &str, &str, i32)] = &[
     ("condsync_sem\0", "\0", "\0", "\0", 0),
     ("condsync_condvar\0", "\0", "\0", "\0", 0),
     ("threads_arg\0", "\0", "\0", "\0", 0),
+    ("threads_arg_cxl\0", "\0", "\0", "\0", 0),
     ("threads\0", "\0", "\0", "\0", 0),
     ("yield\0", "\0", "\0", "\0", 0),
     ("barrier_fail\0", "\0", "\0", "\0", 0),
