@@ -1,19 +1,21 @@
 use super::*;
 /// [head (total read bytes): usize][tail (total written bytes): usize][ring buffer: u8[capacity]]
-pub struct Channel {
+pub struct CxlChannel {
     buf: *mut u8,
     capacity: usize,
 }
 
-impl Channel {
-    pub fn new(buf: *mut u8, buf_size: usize) -> Self {
+impl CxlChannel {
+    pub fn new(capacity: usize) -> Self {
+      let buf = cxl_mmap(capacity + 16) as *mut u8;
       unsafe {
         core::ptr::write_volatile(buf as *mut usize, 0);
         core::ptr::write_volatile(buf.add(8) as *mut usize, 0);
       }
+      Self::cxl_delay(16);
       Self {
         buf,
-        capacity: buf_size - 16,
+        capacity,
       }
     }
     /// Sends the entire data. All or nothing. Blocks until the data is sent.
@@ -53,6 +55,7 @@ impl Channel {
         core::sync::atomic::fence(core::sync::atomic::Ordering::Release);
         core::ptr::write_volatile(self.buf.add(8) as *mut usize, tail + len);
       }
+      Self::cxl_delay(len + 8);
       // println!("Sent {} bytes to channel", len);
       true
     }
@@ -81,6 +84,7 @@ impl Channel {
         core::sync::atomic::fence(core::sync::atomic::Ordering::Release);
         core::ptr::write_volatile(self.buf as *mut usize, head + len);
       }
+      Self::cxl_delay(len + 8);
       // println!("Received {} bytes from channel", len);
       true
     }
@@ -104,6 +108,7 @@ impl Channel {
         core::sync::atomic::fence(core::sync::atomic::Ordering::Release);
         core::ptr::write_volatile(self.buf.add(8) as *mut usize, tail + send_len);
       }
+      Self::cxl_delay(send_len + 8);
       send_len
     }
     /// Might only recv partial data. Returns the number of bytes received. Never blocks.
@@ -126,6 +131,7 @@ impl Channel {
         core::sync::atomic::fence(core::sync::atomic::Ordering::Release);
         core::ptr::write_volatile(self.buf as *mut usize, head + recv_len);
       }
+      Self::cxl_delay(recv_len + 8);
       recv_len
     }
 
@@ -137,13 +143,25 @@ impl Channel {
     }
 
     fn head(&self) -> usize {
+      Self::cxl_delay(8);
       unsafe {
         core::ptr::read_volatile(self.buf as *mut usize)
       }
     }
     fn tail(&self) -> usize {
+      Self::cxl_delay(8);
       unsafe {
         core::ptr::read_volatile(self.buf.add(8) as *mut usize)
       }
     }
+
+    fn cxl_delay(_size: usize) {
+      // for _ in 0..size { core::hint::spin_loop(); }
+    }
+}
+
+impl Drop for CxlChannel {
+  fn drop(&mut self) {
+    cxl_munmap(self.buf as usize, self.capacity + 16);
+  }
 }

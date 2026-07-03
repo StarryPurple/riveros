@@ -6,14 +6,14 @@ extern crate user_lib;
 extern crate alloc;
 extern crate core;
 
-use user_lib::{cxl_mmap, cxl_munmap, pipe, read, thread_create, waittid, write, get_time, Channel, exit, connect, listen, accept};
+use user_lib::{cxl_mmap, cxl_munmap, pipe, read, thread_create, waittid, write, get_time, CxlChannel, exit, connect, listen, accept};
 
 const ITERS: usize = 1000;
 const MSG_SIZE: usize = 64;
 const BUF_SIZE: usize = 3 * MSG_SIZE;
 
 fn channel_writer(buf: usize) -> ! {
-    let ch = unsafe { &*(buf as *const Channel) };
+    let ch = unsafe { &*(buf as *const CxlChannel) };
     for _ in 0..ITERS {
         let data = [0xabu8; MSG_SIZE];
         ch.send(&data);
@@ -22,7 +22,7 @@ fn channel_writer(buf: usize) -> ! {
 }
 
 fn channel_reader(buf: usize) -> ! {
-    let ch = unsafe { &*(buf as *const Channel) };
+    let ch = unsafe { &*(buf as *const CxlChannel) };
     let mut rbuf = [0u8; MSG_SIZE];
     for _ in 0..ITERS {
         ch.recv(&mut rbuf);
@@ -70,13 +70,13 @@ pub fn main() -> i32 {
     println!("Iterations: {}, message size: {} bytes", ITERS, MSG_SIZE);
 
     // ---- Channel benchmark (shared CXL memory) ----
-    let cxl_buf = cxl_mmap(BUF_SIZE) as usize;
-    let ch = Channel::new(cxl_buf as *mut u8, BUF_SIZE);
+    let ch = CxlChannel::new(BUF_SIZE);
     let start = get_time();
     let w = thread_create(linker_symbol_addr!(channel_writer), &ch as *const _ as usize);
     let r = thread_create(linker_symbol_addr!(channel_reader), &ch as *const _ as usize);
     waittid(w as usize);
     waittid(r as usize);
+    drop(ch);
     let ch_elapsed = get_time() - start;
     println!("Channel: {} ms (zero syscall data path)", ch_elapsed);
 
@@ -115,6 +115,5 @@ pub fn main() -> i32 {
         println!("On real CXL hardware, the channel avoids syscall cost entirely.");
     }
     println!("Done.");
-    cxl_munmap(cxl_buf, BUF_SIZE);
     0
 }
