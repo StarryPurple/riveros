@@ -246,6 +246,9 @@ impl MemorySet {
     }
     pub fn recycle_data_pages(&mut self) {
         //*self = Self::new_bare();
+        for area in self.areas.iter_mut() {
+            area.unmap(&mut self.page_table);
+        }
         self.areas.clear();
     }
     pub fn forget_frame(&mut self, vpn: VirtPageNum) {

@@ -5,7 +5,7 @@ use crate::mm::translated_refmut;
 use core::mem::size_of;
 use crate::task::current_process;
 use crate::config::PAGE_SIZE;
-use crate::mm::{MemorySet, MapArea, MapType, MapPermission};
+use crate::mm::{MapArea, MapType, MapPermission};
 use crate::mm::VirtAddr;
 
 /// `size`: the size of the memory to map

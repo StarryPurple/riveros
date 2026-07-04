@@ -8,12 +8,15 @@ use core::arch::asm;
 use lazy_static::*;
 use crate::sync::UPIntrFreeCell;
 use crate::task::for_each_process;
+#[allow(unused)]
 use crate::println_cxl;
 
 pub struct PageMigrator {
     cold_count: BTreeMap<PhysPageNum, u8>,
+    hot_count: BTreeMap<PhysPageNum, u8>,
     scan_interval_ms: usize,
     cold_threshold: u8,
+    hot_threshold: u8,
     last_scan_ms: usize,
 
     /// Statistics
@@ -25,8 +28,10 @@ impl PageMigrator {
     pub fn new() -> Self {
         Self {
             cold_count: BTreeMap::new(),
+            hot_count: BTreeMap::new(),
             scan_interval_ms: 500,
             cold_threshold: 3,
+            hot_threshold: 3,
             last_scan_ms: 0,
             promote_count: 0,
             demote_count: 0,
@@ -46,26 +51,45 @@ impl PageMigrator {
             let tier = FRAME_ALLOCATOR.exclusive_access().page_tier(ppn);
             match tier {
                 Some(MemoryTier::Fast) => {
-                    if !pte.accessed() {
+                    if !pte.accessed() && !pte.dirty() {
+                        // completely cold: not read nor written
                         let count = self.cold_count.entry(ppn).or_insert(0);
                         *count += 1;
                         if *count >= self.cold_threshold {
                             self.demote_page(ppn, vpn, &page_table, token);
-                            self.cold_count.remove(&ppn);
                             break;
                         }
                     } else {
+                        // warm: accessed or modified
                         self.cold_count.remove(&ppn);
+                        self.hot_count.remove(&ppn);
                         pte.clear_accessed();
+                        if pte.dirty() { pte.clear_dirty(); }
                     }
                 }
                 Some(MemoryTier::Slow) => {
-                    if pte.accessed() {
+                    if pte.dirty() {
+                        // dirty once → promote immediately
                         self.promote_page(ppn, vpn, &page_table, token);
                         self.cold_count.remove(&ppn);
+                        self.hot_count.remove(&ppn);
+                        pte.clear_dirty();
+                    } else if pte.accessed() {
+                        // read → increment hot counter
+                        pte.clear_accessed();
+                        let count = self.hot_count.entry(ppn).or_insert(0);
+                        *count += 1;
+                        if *count >= self.hot_threshold {
+                            self.promote_page(ppn, vpn, &page_table, token);
+                        }
                     } else {
+                        // totally idle
+                        self.hot_count.remove(&ppn);
                         let count = self.cold_count.entry(ppn).or_insert(0);
                         *count += 1;
+                        if *count >= self.cold_threshold {
+                            self.cold_count.remove(&ppn);
+                        }
                     }
                 }
                 None => { /* kernel page, trampoline shall handle it */ }
@@ -92,6 +116,9 @@ impl PageMigrator {
         if let Some(count) = self.cold_count.remove(&old_ppn) {
             self.cold_count.insert(new_ppn, count);
         }
+        if let Some(count) = self.hot_count.remove(&old_ppn) {
+            self.hot_count.insert(new_ppn, count);
+        }
     }
     /// fast -> slow
     fn demote_page(
@@ -112,6 +139,9 @@ impl PageMigrator {
         frame_dealloc(old_ppn);
         if let Some(count) = self.cold_count.remove(&old_ppn) {
             self.cold_count.insert(new_ppn, count);
+        }
+        if let Some(count) = self.hot_count.remove(&old_ppn) {
+            self.hot_count.insert(new_ppn, count);
         }
     }
     fn replace_ppn(&mut self, old_ppn: PhysPageNum, new_ppn: PhysPageNum) {

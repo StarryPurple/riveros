@@ -1,7 +1,8 @@
 pub const CLOCK_FREQ: usize = 12500000;
 pub const MEMORY_END: usize = 0x8800_0000;
 
-pub const CXL_SIM_SLOW_MEMORY_START: usize = 0x8600_0000;
+pub const IVSHMEM_BAR_BASE: usize = 0x4000_0000;
+pub const IVSHMEM_BAR_SIZE: usize = 0x0400_0000; // 64 MB
 
 pub const MMIO: &[(usize, usize)] = &[
     (0x0010_0000, 0x00_2000),     // VIRT_TEST/RTC  in virt machine
@@ -9,6 +10,7 @@ pub const MMIO: &[(usize, usize)] = &[
     (0xc000000, 0x210000),        // VIRT_PLIC in virt machine
     (0x10000000, 0x9000),         // VIRT_UART0 with GPU  in virt machine
     (0x30000000, 0x10000000),     // PCIe ECAM (256 MB, all buses)
+    (IVSHMEM_BAR_BASE, IVSHMEM_BAR_SIZE), // ivshmem BAR (64 MB)
 ];
 
 pub type BlockDeviceImpl = crate::drivers::block::VirtIOBlock;

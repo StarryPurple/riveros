@@ -79,14 +79,22 @@ pub fn rust_main() -> ! {
     trap::enable_timer_interrupt();
     timer::set_next_trigger();
     board::device_init();
-    use drivers::bus::pci::{pci_scan, is_cxl_type3};
+    use drivers::bus::pci::{pci_scan, is_cxl_type3, is_ivshmem};
     let pci_devices = pci_scan();
     let pci_count = pci_devices.len();
     let cxl_count = pci_devices.iter().filter(|d| is_cxl_type3(d)).count();
-    println!("PCI: {} device(s) found, {} CXL Type 3", pci_count, cxl_count);
+    let iv_count = pci_devices.iter().filter(|d| is_ivshmem(d)).count();
+    println!("PCI: {} device(s) found, {} CXL Type 3, {} ivshmem", pci_count, cxl_count, iv_count);
+
+    // print ivshmem BARs for debug
     for dev in &pci_devices {
-        println!("  {:02x}:{:02x}.{:01x} {:04x}:{:04x} class={:#04x}",
-            dev.bus, dev.dev, dev.func, dev.vendor_id, dev.device_id, dev.class_code);
+        if is_ivshmem(dev) {
+            for (i, bar) in dev.bars.iter().enumerate() {
+                if let Some((base, size)) = bar {
+                    println!("  ivshmem BAR[{}]: base={:#x} size={:#x}", i, base, size);
+                }
+            }
+        }
     }
     fs::list_apps();
     task::add_initproc();

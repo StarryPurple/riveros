@@ -1,5 +1,5 @@
-/// Agent code generation used for this file.
 use alloc::vec::Vec;
+use crate::config::IVSHMEM_BAR_BASE;
 
 const ECAM_BASE: usize = 0x3000_0000;
 
@@ -134,4 +134,49 @@ pub fn pci_scan() -> Vec<PciDevice> {
 
 pub fn is_cxl_type3(device: &PciDevice) -> bool {
     device.class_code == 0x05 && device.subclass == 0x02
+}
+
+pub fn is_ivshmem(device: &PciDevice) -> bool {
+    device.vendor_id == 0x1af4 && device.device_id == 0x1110
+}
+
+/// If this is an ivshmem device, return the shared memory BAR (base_addr, size).
+pub fn ivshmem_bar(device: &PciDevice) -> Option<(u64, u64)> {
+    if !is_ivshmem(device) {
+        return None;
+    }
+    device.bars
+        .iter()
+        .flatten()
+        .find(|(_, size)| *size > 0x100000) // > 1MB memory BAR (allow base=0)
+        .copied()
+}
+
+/// Configure ivshmem BAR if firmware hasn't assigned a base address.
+/// Returns the base address of the shared memory region.
+pub fn config_ivshmem_bar(device: &PciDevice) -> Option<u64> {
+    if !is_ivshmem(device) {
+        return None;
+    }
+    let (bar_idx, (base, size)) = device.bars.iter().enumerate()
+        .filter_map(|(i, b)| b.map(|v| (i, v)))
+        .find(|(_, (_, sz))| *sz > 0x100000)?;
+
+    if base != 0 {
+        return Some(base); // already configured
+    }
+
+    // Enable PCI bus master + memory space in command register
+    let cmd_off: u8 = 0x04;
+    let cmd = read32(device.bus, device.dev, device.func, cmd_off);
+    write32(device.bus, device.dev, device.func, cmd_off, cmd | 0x6); // Bus Master + Mem Space
+
+    // Assign BAR base at IVSHMEM_BAR_BASE (after ECAM, before virtio MMIO)
+    let new_base: u32 = IVSHMEM_BAR_BASE as u32;
+    let offset = 0x10 + (bar_idx as u8) * 4;
+    let flags = read32(device.bus, device.dev, device.func, offset) & 0xF;
+    write32(device.bus, device.dev, device.func, offset, new_base | flags);
+    write32(device.bus, device.dev, device.func, offset + 4, 0); // upper 32 bits
+
+    Some(new_base as u64)
 }

@@ -84,7 +84,9 @@ QEMU_ARGS := -machine virt \
 			 -device virtio-keyboard-device \
 			 -device virtio-mouse-device \
 			 -device virtio-net-device,netdev=net0 \
-			 -netdev user,id=net0,hostfwd=udp::6200-:2000,hostfwd=tcp::6201-:80
+			 -netdev user,id=net0,hostfwd=udp::6200-:2000,hostfwd=tcp::6201-:80 \
+			 -object memory-backend-file,id=shm0,size=64M,mem-path=../backend-file/cxl.mm,share=on \
+			 -device ivshmem-plain,memdev=shm0
 
 fdt:
 	@qemu-system-riscv64 -M 128m -machine virt,dumpdtb=virt.out

@@ -52,7 +52,9 @@ lazy_static! {
 
 pub fn list_apps() {
     println!("/**** APPS ****");
-    for app in ROOT_INODE.ls() {
+    let mut apps = ROOT_INODE.ls();
+    apps.sort();
+    for app in apps {
         println!("{}", app);
     }
     println!("**************/")
