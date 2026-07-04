@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 use core::fmt::{self, Debug, Formatter};
 use core::ops::Range;
 use lazy_static::*;
-use crate::drivers::bus::pci::{pci_scan, is_ivshmem, ivshmem_bar, config_ivshmem_bar};
+use crate::drivers::bus::pci::{pci_scan, is_ivshmem, config_ivshmem_bar};
 
 pub struct FrameTracker {
     pub ppn: PhysPageNum,
@@ -209,18 +209,14 @@ pub fn init_frame_allocator() {
         PhysAddr::from(MEMORY_END).floor(),
     );
 
-    // slow tier: ivshmem shared memory
+    // CXL shared memory — try ivshmem, init if found
     let devices = pci_scan();
     if let Some(iv) = devices.iter().find(|d| is_ivshmem(d)) {
-        let base = config_ivshmem_bar(iv).unwrap_or(0);
-        let (_, size) = ivshmem_bar(iv).unwrap_or((0, 0));
-        if base != 0 && size > 0 {
-            println!("[CXL] ivshmem at {:#x}-{:#x}", base, base + size);
-            FRAME_ALLOCATOR.exclusive_access().add_slow(
-                PhysAddr::from(base as usize).ceil(),
-                PhysAddr::from((base + size) as usize).floor(),
-            );
-        }
+        config_ivshmem_bar(iv);
+        let (my_id, _first) = crate::cxl::bootstrap::shm_init();
+        println!("[CXL] ivshmem ready, instance {}", my_id);
+    } else {
+        println!("[CXL] no ivshmem found — shared-memory disabled");
     }
 }
 
