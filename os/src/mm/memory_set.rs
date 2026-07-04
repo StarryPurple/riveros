@@ -1,4 +1,4 @@
-use super::{FrameTracker, frame_alloc, frame_alloc_slow};
+use super::{FrameTracker, frame_alloc, frame_alloc_slow, frame_alloc_slow_any};
 use super::{PTEFlags, PageTable, PageTableEntry};
 use super::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum};
 use super::{StepByOne, VPNRange};
@@ -323,7 +323,7 @@ impl MapArea {
                 self.data_frames.insert(vpn, frame);
             }
             MapType::FramedSlow => {
-                let frame = frame_alloc_slow().unwrap();
+                let frame = frame_alloc_slow_any().unwrap();
                 ppn = frame.ppn;
                 self.data_frames.insert(vpn, frame);
             }

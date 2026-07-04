@@ -59,7 +59,7 @@ impl PageMigrator {
                         pte.clear_accessed();
                     }
                 }
-                Some(MemoryTier::Slow) => {
+                Some(MemoryTier::Slow(card_idx)) => {
                     if pte.accessed() {
                         self.promote_page(ppn, vpn, &page_table, token);
                         self.cold_count.remove(&ppn);
@@ -102,7 +102,7 @@ impl PageMigrator {
         _token: usize,
     ) {
         self.demote_count += 1;
-        let new_ppn = FRAME_ALLOCATOR.exclusive_access().alloc_slow().unwrap();
+        let new_ppn = FRAME_ALLOCATOR.exclusive_access().alloc_slow_any().unwrap();
         copy_page(old_ppn, new_ppn);
         self.replace_ppn(old_ppn, new_ppn);
         unsafe {

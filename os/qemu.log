@@ -1,0 +1,77 @@
+[0;32mQEMU version is 11.0.1(>=7), OK![0m
+(rustup target list | grep "riscv64gc-unknown-none-elf (installed)") || rustup target add riscv64gc-unknown-none-elf
+riscv64gc-unknown-none-elf (installed)
+cargo install cargo-binutils
+    Updating crates.io index
+     Ignored package `cargo-binutils v0.4.0` is already installed, use --force to override
+rustup component add rust-src
+info: component rust-src is up to date
+rustup component add llvm-tools-preview
+info: component llvm-tools is up to date
+Platform: qemu
+   Compiling os v0.1.0 (/home/starr/Projects/ACM-Class-2026-Spring/riveros/os)
+warning: unused import: `crate::println_cxl`
+  --> src/mm/page_migrator.rs:11:5
+   |
+11 | use crate::println_cxl;
+   |     ^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `MemorySet`
+ --> src/syscall/cxl.rs:8:17
+  |
+8 | use crate::mm::{MemorySet, MapArea, MapType, MapPermission};
+  |                 ^^^^^^^^^
+
+warning: `os` (bin "os") generated 2 warnings (run `cargo fix --bin "os"` to apply 2 suggestions)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1.55s
+make[1]: Entering directory '/home/starr/Projects/ACM-Class-2026-Spring/riveros/user'
+warning: variable does not need to be mutable
+   --> src/bin/threads_arg_cxl.rs:107:9
+    |
+107 |     let mut args: Vec<ThreadArg> = (0..THREAD_COUNT)
+    |         ----^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` on by default
+
+warning: variable does not need to be mutable
+   --> src/bin/threads_arg_cxl.rs:249:9
+    |
+249 |     let mut args: Vec<ThreadArg> = (0..THREAD_COUNT)
+    |         ----^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: unused imports: `cxl_mmap` and `cxl_munmap`
+ --> src/bin/channel_bench_cxl.rs:9:16
+  |
+9 | use user_lib::{cxl_mmap, cxl_munmap, pipe, read, thread_create, waittid, write, get_time, CxlChannel, exit, connect, listen, accept};
+  |                ^^^^^^^^  ^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: function `tcp_server` is never used
+  --> src/bin/channel_bench_cxl.rs:33:4
+   |
+33 | fn tcp_server(port: usize) -> ! {
+   |    ^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: function `tcp_client` is never used
+  --> src/bin/channel_bench_cxl.rs:43:4
+   |
+43 | fn tcp_client(port: usize) -> ! {
+   |    ^^^^^^^^^^
+
+warning: `user_lib` (bin "threads_arg_cxl") generated 2 warnings (run `cargo fix --bin "threads_arg_cxl"` to apply 2 suggestions)
+warning: `user_lib` (bin "channel_bench_cxl") generated 3 warnings (run `cargo fix --bin "channel_bench_cxl"` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+make[1]: Leaving directory '/home/starr/Projects/ACM-Class-2026-Spring/riveros/user'
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running `target/release/easy-fs-fuse -s ../user/src/bin/ -t ../user/target/riscv64gc-unknown-none-elf/release/`
+src_path = ../user/src/bin/
+target_path = ../user/target/riscv64gc-unknown-none-elf/release/

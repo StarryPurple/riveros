@@ -1,7 +1,21 @@
 pub const CLOCK_FREQ: usize = 12500000;
 pub const MEMORY_END: usize = 0x8800_0000;
+pub const DRAM_MEMORY_END: usize = 0x8400_0000;
 
-pub const CXL_SIM_SLOW_MEMORY_START: usize = 0x8600_0000;
+pub const CXL_CARD_COUNT: usize = 32;
+pub const CXL_MEMORY_RANGE_START: usize = DRAM_MEMORY_END;
+pub const CXL_CARD_MEMORY_RANGE: usize = (MEMORY_END - CXL_MEMORY_RANGE_START) / CXL_CARD_COUNT; // 2MB
+const fn generate_cxl_ranges() -> [(usize, usize); CXL_CARD_COUNT] {
+  let mut ranges = [(0, 0); CXL_CARD_COUNT];
+  let mut i = 0;
+  while i < CXL_CARD_COUNT {
+    let start = CXL_MEMORY_RANGE_START + i * CXL_CARD_MEMORY_RANGE;
+    ranges[i] = (start, start + CXL_CARD_MEMORY_RANGE);
+    i += 1;
+  }
+  ranges
+}
+pub const CXL_MEMORY_RANGES: [(usize, usize); CXL_CARD_COUNT] = generate_cxl_ranges();
 
 pub const MMIO: &[(usize, usize)] = &[
     (0x0010_0000, 0x00_2000),     // VIRT_TEST/RTC  in virt machine

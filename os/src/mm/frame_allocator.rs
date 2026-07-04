@@ -1,13 +1,14 @@
 use super::{PhysAddr, PhysPageNum};
-use crate::config::{CXL_SIM_SLOW_MEMORY_START, MEMORY_END};
+use crate::config::{CXL_CARD_COUNT, CXL_MEMORY_RANGES, DRAM_MEMORY_END};
 use crate::drivers::pci::PciDevice;
 use crate::sync::UPIntrFreeCell;
 use alloc::vec::Vec;
+use alloc::collections::BTreeMap;
 use core::fmt::{self, Debug, Formatter};
 use core::ops::Range;
 use lazy_static::*;
 use crate::drivers::bus::pci::{pci_scan, is_cxl_type3};
-
+use crate::cxl::{CxlCardId};
 pub struct FrameTracker {
     pub ppn: PhysPageNum,
 }
@@ -102,51 +103,68 @@ impl StackFrameAllocator {
 #[derive(Debug, PartialEq)]
 pub enum MemoryTier {
     Fast,
-    Slow,
+    Slow(CxlCardId),
 }
 
 pub struct TieredFrameAllocator {
     fast: StackFrameAllocator,
-    slow: Option<StackFrameAllocator>,
+    slow: BTreeMap<CxlCardId, StackFrameAllocator>,
 
     /// Statistics
     pub fast_alloc_count: u64,
-    pub slow_alloc_count: u64,
+    pub slow_alloc_count: [u64; CXL_CARD_COUNT],
     pub fast_dealloc_count: u64,
-    pub slow_dealloc_count: u64,
+    pub slow_dealloc_count: [u64; CXL_CARD_COUNT],
 }
 
 impl TieredFrameAllocator {
     pub fn new() -> Self {
         Self {
             fast: StackFrameAllocator::new(),
-            slow: None,
+            slow: BTreeMap::new(),
             fast_alloc_count: 0,
-            slow_alloc_count: 0,
+            slow_alloc_count: [0; CXL_CARD_COUNT],
             fast_dealloc_count: 0,
-            slow_dealloc_count: 0,
+            slow_dealloc_count: [0; CXL_CARD_COUNT],
         }
     }
     /// Fast tier must be valid.
     pub fn init(&mut self, l: PhysPageNum, r: PhysPageNum) {
         self.fast.init(l, r);
     }
-    pub fn add_slow(&mut self, l: PhysPageNum, r: PhysPageNum) {
+    pub fn add_slow(&mut self, card_id: CxlCardId, l: PhysPageNum, r: PhysPageNum) {
         let mut slow = StackFrameAllocator::new();
         slow.init(l, r);
-        self.slow = Some(slow);
+        self.slow.insert(card_id, slow);
     }
     pub fn alloc_fast(&mut self) -> Option<PhysPageNum> {
         self.fast_alloc_count += 1;
         self.fast.alloc()
     }
-    pub fn alloc_slow(&mut self) -> Option<PhysPageNum> {
-        self.slow_alloc_count += 1;
-        self.slow.as_mut()?.alloc()
+    pub fn alloc_slow_any(&mut self) -> Option<PhysPageNum> {
+      for card_id in 0..CXL_CARD_COUNT {
+        if let Some(ppn) = self.alloc_slow(CxlCardId(card_id)) {
+          return Some(ppn);
+        }
+      }
+      None
+    }
+    pub fn alloc_slow(&mut self, card_id: CxlCardId) -> Option<PhysPageNum> {
+        self.slow_alloc_count[card_id.0 as usize] += 1;
+        self.slow.get_mut(&card_id).and_then(|slow| slow.alloc())
     }
     /// Alloc from fast first, then fallback to slow.
     pub fn alloc(&mut self) -> Option<PhysPageNum> {
-        self.alloc_fast().or_else(|| self.alloc_slow())
+        if let Some(ppn) = self.alloc_fast() {
+            return Some(ppn);
+        }
+        let card_ids = self.slow.keys().copied().collect::<Vec<_>>();
+        for card_id in card_ids {
+            if let Some(ppn) = self.alloc_slow(card_id) {
+                return Some(ppn);
+            }
+        }
+        None
     }
     pub fn alloc_more(&mut self, pages: usize) -> Option<Vec<PhysPageNum>> {
         let mut result = Vec::with_capacity(pages);
@@ -170,9 +188,10 @@ impl TieredFrameAllocator {
             self.fast_dealloc_count += 1;
             self.fast.dealloc(ppn);
             return;
-        } else if let Some(ref mut slow) = self.slow {
+        } 
+        for (card_id, slow) in self.slow.iter_mut() {
             if slow.stack_range().contains(&ppn) {
-                self.slow_dealloc_count += 1;
+                self.slow_dealloc_count[card_id.0 as usize] += 1;
                 slow.dealloc(ppn);
                 return;
             }
@@ -183,9 +202,10 @@ impl TieredFrameAllocator {
     pub fn page_tier(&self, ppn: PhysPageNum) -> Option<MemoryTier> {
         if self.fast.stack_range().contains(&ppn) {
             return Some(MemoryTier::Fast);
-        } else if let Some(ref slow) = self.slow {
+        }
+        for (card_id, slow) in self.slow.iter() {
             if slow.stack_range().contains(&ppn) {
-                return Some(MemoryTier::Slow);
+                return Some(MemoryTier::Slow(*card_id));
             }
         }
         None
@@ -206,7 +226,7 @@ pub fn init_frame_allocator() {
     }
     FRAME_ALLOCATOR.exclusive_access().init(
         PhysAddr::from(linker_symbol_addr!(ekernel)).ceil(),
-        PhysAddr::from(CXL_SIM_SLOW_MEMORY_START).floor(),
+        PhysAddr::from(DRAM_MEMORY_END).floor(),
     );
     let cxl_devices: Vec<PciDevice> = pci_scan().into_iter().filter(|d| is_cxl_type3(d)).collect();
     if !cxl_devices.is_empty() {
@@ -215,22 +235,26 @@ pub fn init_frame_allocator() {
             if let Some((base, size)) = bar {
                 println_cxl!("CXL Type3 at {:#x}-{:#x}", base, base + size);
                 FRAME_ALLOCATOR.exclusive_access().add_slow(
+                  CxlCardId(dev.device_id as usize),
                   PhysAddr::from(base as usize).ceil(),
                   PhysAddr::from((base + size) as usize).floor()
                 );
             }
         }
     } else {
-      FRAME_ALLOCATOR.exclusive_access().add_slow(
-        PhysAddr::from(CXL_SIM_SLOW_MEMORY_START).ceil(),
-        PhysAddr::from(MEMORY_END).floor(),
-      );
+      for (i, (start, end)) in CXL_MEMORY_RANGES.iter().enumerate() {
+        FRAME_ALLOCATOR.exclusive_access().add_slow(
+          CxlCardId(i),
+          PhysAddr::from(*start as usize).ceil(),
+          PhysAddr::from(*end as usize).floor()
+        );
+      }
     }
 }
 
 #[allow(unused)]
-pub fn add_slow_frame_allocator(l: PhysPageNum, r: PhysPageNum) {
-    FRAME_ALLOCATOR.exclusive_access().add_slow(l, r);
+pub fn add_slow_frame_allocator(card_id: CxlCardId, l: PhysPageNum, r: PhysPageNum) {
+    FRAME_ALLOCATOR.exclusive_access().add_slow(card_id, l, r);
 }
 
 pub fn frame_alloc() -> Option<FrameTracker> {
@@ -240,10 +264,10 @@ pub fn frame_alloc() -> Option<FrameTracker> {
         .map(FrameTracker::new)
 }
 
-pub fn frame_alloc_slow() -> Option<FrameTracker> {
+pub fn frame_alloc_slow(card_id: CxlCardId) -> Option<FrameTracker> {
     FRAME_ALLOCATOR
         .exclusive_access()
-        .alloc_slow()
+        .alloc_slow(card_id)
         .map(FrameTracker::new)
 }
 
@@ -295,7 +319,7 @@ pub fn frame_allocator_alloc_more_test() {
 
 #[allow(unused)]
 pub fn tier_alloc_test() {
-    let slow = FRAME_ALLOCATOR.exclusive_access().alloc_slow().unwrap();
+    let slow = FRAME_ALLOCATOR.exclusive_access().alloc_slow(CxlCardId(0)).unwrap();
     let tier = FRAME_ALLOCATOR.exclusive_access().page_tier(slow);
     println!("[CXL] slow ppn={:#x}, tier={:?}", slow.0, tier);
 
