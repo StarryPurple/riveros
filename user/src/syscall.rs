@@ -35,6 +35,9 @@ const SYSCALL_KEY_PRESSED: usize = 3001;
 const SYSCALL_CXL_MEMINFO: usize = 4000;
 const SYSCALL_CXL_MMAP: usize = 4001;
 const SYSCALL_CXL_MUNMAP: usize = 4002;
+const SYSCALL_CXL_ADD_CARD: usize = 4003;
+const SYSCALL_CXL_REMOVE_CARD: usize = 4004;
+const SYSCALL_CXL_ROUTE: usize = 4005;
 
 fn syscall(id: usize, args: [usize; 3]) -> isize {
     let mut ret: isize;
@@ -207,4 +210,16 @@ pub fn sys_cxl_mmap(size: usize) -> isize {
 
 pub fn sys_cxl_munmap(ptr: usize, size: usize) -> isize {
     syscall(SYSCALL_CXL_MUNMAP, [ptr, size, 0])
+}
+
+pub fn sys_cxl_add_card(card_id: usize) -> isize {
+    syscall(SYSCALL_CXL_ADD_CARD, [card_id, 0, 0])
+}
+
+pub fn sys_cxl_remove_card(card_id: usize) -> isize {
+    syscall(SYSCALL_CXL_REMOVE_CARD, [card_id, 0, 0])
+}
+
+pub fn sys_cxl_route(key: u64) -> isize {
+    syscall(SYSCALL_CXL_ROUTE, [key as usize, 0, 0])
 }

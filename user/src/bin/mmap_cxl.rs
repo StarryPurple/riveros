@@ -6,14 +6,18 @@ extern crate user_lib;
 extern crate alloc;
 extern crate core;
 
-use user_lib::{CxlMemInfo, query_cxl_meminfo, cxl_mmap, cxl_munmap};
+use user_lib::{CxlMemInfo, query_cxl_meminfo, cxl_mmap, cxl_munmap, CXL_CARD_COUNT};
+
+fn total_slow_alloc(info: &CxlMemInfo) -> u64 {
+    info.slow_alloc_count.iter().sum()
+}
 
 #[unsafe(no_mangle)]
 pub fn main() -> i32 {
     const N: usize = 20;
     let mut cxl_meminfo = CxlMemInfo::default();
     query_cxl_meminfo(&mut cxl_meminfo);
-    let start_slow_alloc_count = cxl_meminfo.slow_alloc_count;
+    let start_slow_alloc_count = total_slow_alloc(&cxl_meminfo);
     let ptr = cxl_mmap(N * 4096) as *mut u8;
     unsafe {
       for i in 0..(N * 4096) {
@@ -30,7 +34,7 @@ pub fn main() -> i32 {
     println!("checksum = {}, should be {}, {}", sum, answer, if sum == answer { "correct" } else { "incorrect" });
     assert_eq!(sum, answer);
     query_cxl_meminfo(&mut cxl_meminfo);
-    let end_slow_alloc_count = cxl_meminfo.slow_alloc_count;
+    let end_slow_alloc_count = total_slow_alloc(&cxl_meminfo);
     let delta = end_slow_alloc_count - start_slow_alloc_count;
     println!("cxl info after mmap: {:?}", cxl_meminfo);
     println!("cxl slow alloc delta = {}, shall be nearly always equal to N = {}", delta, N);
