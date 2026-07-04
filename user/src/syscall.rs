@@ -35,6 +35,8 @@ const SYSCALL_KEY_PRESSED: usize = 3001;
 const SYSCALL_CXL_MEMINFO: usize = 4000;
 const SYSCALL_CXL_MMAP: usize = 4001;
 const SYSCALL_CXL_MUNMAP: usize = 4002;
+const SYSCALL_CXL_RING_PUSH: usize = 4003;
+const SYSCALL_CXL_RING_POP: usize = 4004;
 
 fn syscall(id: usize, args: [usize; 3]) -> isize {
     let mut ret: isize;
@@ -207,4 +209,12 @@ pub fn sys_cxl_mmap(size: usize) -> isize {
 
 pub fn sys_cxl_munmap(ptr: usize, size: usize) -> isize {
     syscall(SYSCALL_CXL_MUNMAP, [ptr, size, 0])
+}
+
+pub fn sys_cxl_ring_push(buf: *const u8) -> isize {
+    syscall(SYSCALL_CXL_RING_PUSH, [buf as usize, 0, 0])
+}
+
+pub fn sys_cxl_ring_pop(buf: *mut u8) -> isize {
+    syscall(SYSCALL_CXL_RING_POP, [buf as usize, 0, 0])
 }

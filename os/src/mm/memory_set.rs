@@ -330,6 +330,11 @@ impl MapArea {
                 ppn = frame.ppn;
                 self.data_frames.insert(vpn, frame);
             }
+            MapType::FramedShm => {
+                let idx = crate::cxl::allocator::shm_alloc_page().unwrap();
+                ppn = crate::cxl::allocator::shm_page_to_ppn(idx);
+                self.data_frames.insert(vpn, FrameTracker::new(ppn));
+            }
             MapType::Linear(pn_offset) => {
                 // check for sv39
                 assert!(vpn.0 < (1usize << 27));
@@ -340,7 +345,7 @@ impl MapArea {
         page_table.map(vpn, ppn, pte_flags);
     }
     pub fn unmap_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
-        if self.map_type == MapType::Framed {
+        if self.map_type == MapType::Framed || self.map_type == MapType::FramedShm {
             self.data_frames.remove(&vpn);
         }
         page_table.unmap(vpn);
@@ -384,6 +389,7 @@ pub enum MapType {
     Identical,
     Framed,
     FramedSlow,
+    FramedShm,
     /// offset of page num
     Linear(isize),
 }

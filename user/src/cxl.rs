@@ -25,3 +25,11 @@ pub fn cxl_mmap(size: usize) -> isize {
 pub fn cxl_munmap(ptr: usize, size: usize) -> isize {
     sys_cxl_munmap(ptr, size)
 }
+
+pub fn cxl_ring_push(data: &[u8; 60]) -> isize {
+    sys_cxl_ring_push(data as *const u8)
+}
+
+pub fn cxl_ring_pop(data: &mut [u8; 60]) -> isize {
+    sys_cxl_ring_pop(data as *mut u8)
+}

@@ -104,8 +104,12 @@ impl PageMigrator {
         _page_table: &PageTable,
         _token: usize,
     ) {
+        let new_ppn = FRAME_ALLOCATOR.exclusive_access().alloc_fast();
+        if new_ppn.is_none() {
+            return;
+        }
+        let new_ppn = new_ppn.unwrap();
         self.promote_count += 1;
-        let new_ppn = FRAME_ALLOCATOR.exclusive_access().alloc_fast().unwrap();
         copy_page(old_ppn, new_ppn);
         self.replace_ppn(old_ppn, new_ppn);
         unsafe {
@@ -128,8 +132,12 @@ impl PageMigrator {
         _page_table: &PageTable,
         _token: usize,
     ) {
+        let new_ppn = FRAME_ALLOCATOR.exclusive_access().alloc_slow();
+        if new_ppn.is_none() {
+            return;
+        }
+        let new_ppn = new_ppn.unwrap();
         self.demote_count += 1;
-        let new_ppn = FRAME_ALLOCATOR.exclusive_access().alloc_slow().unwrap();
         copy_page(old_ppn, new_ppn);
         self.replace_ppn(old_ppn, new_ppn);
         unsafe {

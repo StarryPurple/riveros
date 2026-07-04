@@ -69,3 +69,43 @@ pub const GC_PENDING_OFF:   usize = GC_PENDING_PAGE * PAGE_SIZE;
 
 // Magic value
 pub const SHM_MAGIC: u64 = 0x5348_4D45_4D55_4E53; // "SHMEMUNS" in hex
+
+/// First physical page number of the SHM data region.
+pub const SHM_DATA_PPN_BASE: usize = (SHM_BASE / PAGE_SIZE) + HEADER_PAGES;
+
+// ── Shared-memory access primitives ──
+
+use core::arch::asm;
+
+#[inline(always)]
+pub unsafe fn shm_fence() {
+    unsafe { asm!("fence iorw, iorw"); }
+}
+
+#[inline(always)]
+pub unsafe fn shm_read32(off: usize) -> u32 {
+    let ptr = (SHM_BASE + off) as *const u32;
+    unsafe { shm_fence(); }
+    unsafe { ptr.read_volatile() }
+}
+
+#[inline(always)]
+pub unsafe fn shm_read64(off: usize) -> u64 {
+    let ptr = (SHM_BASE + off) as *const u64;
+    unsafe { shm_fence(); }
+    unsafe { ptr.read_volatile() }
+}
+
+#[inline(always)]
+pub unsafe fn shm_write32(off: usize, val: u32) {
+    let ptr = (SHM_BASE + off) as *mut u32;
+    unsafe { ptr.write_volatile(val); }
+    unsafe { shm_fence(); }
+}
+
+#[inline(always)]
+pub unsafe fn shm_write64(off: usize, val: u64) {
+    let ptr = (SHM_BASE + off) as *mut u64;
+    unsafe { ptr.write_volatile(val); }
+    unsafe { shm_fence(); }
+}

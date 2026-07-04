@@ -15,7 +15,7 @@ pub fn sys_cxl_mmap(size: usize) -> isize {
   let mut inner = process.inner_exclusive_access();
   let start_va = inner.memory_set.find_mmap_base(page_count).unwrap();
   let end_va: VirtAddr = (start_va.0 + page_count * PAGE_SIZE).into();
-  let area = MapArea::new(start_va, end_va, MapType::FramedSlow, MapPermission::R | MapPermission::W | MapPermission::U);
+  let area = MapArea::new(start_va, end_va, MapType::FramedShm, MapPermission::R | MapPermission::W | MapPermission::U);
   inner.memory_set.push(area, None);
   start_va.0 as isize
 }
@@ -26,6 +26,41 @@ pub fn sys_cxl_munmap(ptr: usize, _size: usize) -> isize {
   let mut inner = process.inner_exclusive_access();
   inner.memory_set.remove_area_with_start_vpn(ptr.into());
   0
+}
+
+/// Write 60 bytes into the shared ring buffer (lock-free, non-blocking).
+pub fn sys_cxl_ring_push(buf: *const u8) -> isize {
+    let mut msg = [0u8; crate::cxl::ring::MSG_SIZE];
+    let token = current_user_token();
+    let src = unsafe { crate::mm::translated_byte_buffer(token, buf, msg.len()) };
+    let mut copied = 0usize;
+    for seg in src {
+        let len = seg.len().min(msg.len() - copied);
+        msg[copied..copied + len].copy_from_slice(&seg[..len]);
+        copied += len;
+        if copied >= msg.len() { break; }
+    }
+    if unsafe { crate::cxl::ring::push(&msg) } { 0 } else { -1 }
+}
+
+/// Read 60 bytes from the shared ring buffer (lock-free, non-blocking).
+pub fn sys_cxl_ring_pop(buf: *mut u8) -> isize {
+    let result = unsafe { crate::cxl::ring::pop() };
+    match result {
+        None => -1,
+        Some(msg) => {
+            let token = current_user_token();
+            let dst = unsafe { crate::mm::translated_byte_buffer(token, buf, msg.len()) };
+            let mut copied = 0usize;
+            for seg in dst {
+                let len = seg.len().min(msg.len() - copied);
+                seg[..len].copy_from_slice(&msg[copied..copied + len]);
+                copied += len;
+                if copied >= msg.len() { break; }
+            }
+            0
+        }
+    }
 }
 
 #[repr(C)]

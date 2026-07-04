@@ -247,6 +247,12 @@ pub fn frame_alloc_more(num: usize) -> Option<Vec<FrameTracker>> {
 }
 
 pub fn frame_dealloc(ppn: PhysPageNum) {
+    if crate::cxl::allocator::is_shm_page(ppn) {
+        if let Some(idx) = crate::cxl::allocator::ppn_to_shm_idx(ppn) {
+            crate::cxl::allocator::shm_free_page(idx);
+            return;
+        }
+    }
     FRAME_ALLOCATOR.exclusive_access().dealloc(ppn);
 }
 
