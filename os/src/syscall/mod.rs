@@ -35,6 +35,9 @@ const SYSCALL_KEY_PRESSED: usize = 3001;
 const SYSCALL_CXL_MEMINFO: usize = 4000;
 const SYSCALL_CXL_MMAP: usize = 4001;
 const SYSCALL_CXL_MUNMAP: usize = 4002;
+const SYSCALL_CXL_ADD_CARD: usize = 4003;
+const SYSCALL_CXL_REMOVE_CARD: usize = 4004;
+const SYSCALL_CXL_ROUTE: usize = 4005;
 
 mod fs;
 mod gui;
@@ -92,6 +95,9 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         SYSCALL_CXL_MEMINFO => sys_cxl_meminfo(args[0] as *mut CxlMemInfo),
         SYSCALL_CXL_MMAP => sys_cxl_mmap(args[0]),
         SYSCALL_CXL_MUNMAP => sys_cxl_munmap(args[0], args[1]),
+        SYSCALL_CXL_ADD_CARD => sys_cxl_add_card(args[0]),
+        SYSCALL_CXL_REMOVE_CARD => sys_cxl_remove_card(args[0]),
+        SYSCALL_CXL_ROUTE => sys_cxl_route(args[0] as u64),
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     }
 }

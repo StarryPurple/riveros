@@ -1,4 +1,4 @@
-use super::{PhysAddr, PhysPageNum};
+use super::{PhysAddr, PhysPageNum, VirtPageNum};
 use crate::config::{CXL_CARD_COUNT, CXL_MEMORY_RANGES, DRAM_MEMORY_END};
 use crate::drivers::pci::PciDevice;
 use crate::sync::UPIntrFreeCell;
@@ -8,7 +8,7 @@ use core::fmt::{self, Debug, Formatter};
 use core::ops::Range;
 use lazy_static::*;
 use crate::drivers::bus::pci::{pci_scan, is_cxl_type3};
-use crate::cxl::{CxlCardId};
+use crate::cxl::{CxlCardId, CXL_CARD_MANAGER};
 pub struct FrameTracker {
     pub ppn: PhysPageNum,
 }
@@ -136,18 +136,24 @@ impl TieredFrameAllocator {
         let mut slow = StackFrameAllocator::new();
         slow.init(l, r);
         self.slow.insert(card_id, slow);
+        /* now demotion to this slow tier is allowed */
+
+        /* Now migrate certain data in the hash ring to this cxl card node */
+    }
+    /// Return true for success.
+    /// False for reject: possibly for insufficient space for page / hashring data migration detected.
+    pub fn try_eject_slow(&mut self, card_id: CxlCardId) -> bool {
+        /* promote all pages to fast tier */
+
+        /* migrate data to other cxl card nodes */
+
+        /* migration complete, remove this card */
+        self.slow.remove(&card_id);
+        true
     }
     pub fn alloc_fast(&mut self) -> Option<PhysPageNum> {
         self.fast_alloc_count += 1;
         self.fast.alloc()
-    }
-    pub fn alloc_slow_any(&mut self) -> Option<PhysPageNum> {
-      for card_id in 0..CXL_CARD_COUNT {
-        if let Some(ppn) = self.alloc_slow(CxlCardId(card_id)) {
-          return Some(ppn);
-        }
-      }
-      None
     }
     pub fn alloc_slow(&mut self, card_id: CxlCardId) -> Option<PhysPageNum> {
         self.slow_alloc_count[card_id.0 as usize] += 1;
@@ -228,6 +234,7 @@ pub fn init_frame_allocator() {
         PhysAddr::from(linker_symbol_addr!(ekernel)).ceil(),
         PhysAddr::from(DRAM_MEMORY_END).floor(),
     );
+    /*
     let cxl_devices: Vec<PciDevice> = pci_scan().into_iter().filter(|d| is_cxl_type3(d)).collect();
     if !cxl_devices.is_empty() {
         for dev in cxl_devices {
@@ -249,12 +256,20 @@ pub fn init_frame_allocator() {
           PhysAddr::from(*end as usize).floor()
         );
       }
-    }
+    } 
+    */
 }
 
 #[allow(unused)]
 pub fn add_slow_frame_allocator(card_id: CxlCardId, l: PhysPageNum, r: PhysPageNum) {
     FRAME_ALLOCATOR.exclusive_access().add_slow(card_id, l, r);
+}
+
+pub fn frame_alloc_fast() -> Option<FrameTracker> {
+    FRAME_ALLOCATOR
+        .exclusive_access()
+        .alloc_fast()
+        .map(FrameTracker::new)
 }
 
 pub fn frame_alloc() -> Option<FrameTracker> {
@@ -265,10 +280,18 @@ pub fn frame_alloc() -> Option<FrameTracker> {
 }
 
 pub fn frame_alloc_slow(card_id: CxlCardId) -> Option<FrameTracker> {
-    FRAME_ALLOCATOR
-        .exclusive_access()
-        .alloc_slow(card_id)
-        .map(FrameTracker::new)
+    let ppn = FRAME_ALLOCATOR.exclusive_access().alloc_slow(card_id)?;
+    CXL_CARD_MANAGER.exclusive_access().track_card_ppn(ppn, card_id);
+    Some(FrameTracker::new(ppn))
+}
+
+/// route on hash ring via vpn
+pub fn frame_alloc_slow_route(vpn: VirtPageNum) -> Option<FrameTracker> {
+    let card_id = {
+        let mgr = CXL_CARD_MANAGER.exclusive_access();
+        mgr.hash_ring.route(vpn.0 as u64).copied()?
+    };
+    frame_alloc_slow(card_id)
 }
 
 pub fn frame_alloc_more(num: usize) -> Option<Vec<FrameTracker>> {
@@ -279,6 +302,12 @@ pub fn frame_alloc_more(num: usize) -> Option<Vec<FrameTracker>> {
 }
 
 pub fn frame_dealloc(ppn: PhysPageNum) {
+    {
+        let mut mgr = CXL_CARD_MANAGER.exclusive_access();
+        if mgr.get_ppn_card(ppn).is_some() {
+            mgr.untrack_page(ppn);
+        }
+    }
     FRAME_ALLOCATOR.exclusive_access().dealloc(ppn);
 }
 

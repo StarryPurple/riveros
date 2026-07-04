@@ -1,6 +1,6 @@
 use super::frame_allocator::{FRAME_ALLOCATOR, MemoryTier};
 use super::page_table::{PageTable, PageTableEntry};
-use super::{PhysPageNum, VirtPageNum, frame_dealloc, copy_page};
+use super::{PhysPageNum, VirtPageNum, frame_dealloc, frame_alloc_fast, frame_alloc_slow_route, copy_page};
 use crate::task::current_process;
 use crate::timer::get_time_ms;
 use alloc::collections::BTreeMap;
@@ -8,6 +8,8 @@ use core::arch::asm;
 use lazy_static::*;
 use crate::sync::UPIntrFreeCell;
 use crate::task::for_each_process;
+use crate::cxl::CXL_CARD_MANAGER;
+#[allow(unused)]
 use crate::println_cxl;
 
 pub struct PageMigrator {
@@ -51,7 +53,6 @@ impl PageMigrator {
                         *count += 1;
                         if *count >= self.cold_threshold {
                             self.demote_page(ppn, vpn, &page_table, token);
-                            self.cold_count.remove(&ppn);
                             break;
                         }
                     } else {
@@ -62,7 +63,6 @@ impl PageMigrator {
                 Some(MemoryTier::Slow(card_idx)) => {
                     if pte.accessed() {
                         self.promote_page(ppn, vpn, &page_table, token);
-                        self.cold_count.remove(&ppn);
                     } else {
                         let count = self.cold_count.entry(ppn).or_insert(0);
                         *count += 1;
@@ -80,53 +80,70 @@ impl PageMigrator {
         _page_table: &PageTable,
         _token: usize,
     ) {
+        let new_frame = match frame_alloc_fast() {
+            Some(f) => f,
+            None => return, // no DRAM frame available, skip this promotion
+        };
         self.promote_count += 1;
-        let new_ppn = FRAME_ALLOCATOR.exclusive_access().alloc_fast().unwrap();
+        let new_ppn = new_frame.ppn;
         copy_page(old_ppn, new_ppn);
         self.replace_ppn(old_ppn, new_ppn);
         unsafe {
             asm!("sfence.vma");
         }
-        // println_cxl!("promote_page: old_ppn={:#x}, new_ppn={:#x}", old_ppn.0, new_ppn.0);
+        println_cxl!("promote_page: old_ppn={:#x}, new_ppn={:#x}", old_ppn.0, new_ppn.0);
         frame_dealloc(old_ppn);
         if let Some(count) = self.cold_count.remove(&old_ppn) {
             self.cold_count.insert(new_ppn, count);
         }
+        core::mem::forget(new_frame); // prevent FrameTracker::drop from double-free of new_ppn
     }
     /// fast -> slow
     fn demote_page(
         &mut self,
         old_ppn: PhysPageNum,
-        _vpn: VirtPageNum,
+        vpn: VirtPageNum,
         _page_table: &PageTable,
         _token: usize,
     ) {
+        let new_frame = match frame_alloc_slow_route(vpn) {
+            Some(f) => f,
+            None => return, // no CXL card available, skip this demotion
+        };
         self.demote_count += 1;
-        let new_ppn = FRAME_ALLOCATOR.exclusive_access().alloc_slow_any().unwrap();
+        let new_ppn = new_frame.ppn;
         copy_page(old_ppn, new_ppn);
-        self.replace_ppn(old_ppn, new_ppn);
+        self.replace_ppn(old_ppn, new_ppn); 
         unsafe {
             asm!("sfence.vma");
         }
-        // println_cxl!("demote_page: old_ppn={:#x}, new_ppn={:#x}", old_ppn.0, new_ppn.0);
+        let pid = current_process().getpid();
+        CXL_CARD_MANAGER.exclusive_access().track_page_vpn(new_ppn, vpn, pid);
+        println_cxl!("demote_page: old_ppn={:#x}, new_ppn={:#x}", old_ppn.0, new_ppn.0);
         frame_dealloc(old_ppn);
         if let Some(count) = self.cold_count.remove(&old_ppn) {
             self.cold_count.insert(new_ppn, count);
         }
+        core::mem::forget(new_frame); // already tracked by CXL_CARD_MANAGER, prevent double-free
     }
     fn replace_ppn(&mut self, old_ppn: PhysPageNum, new_ppn: PhysPageNum) {
-      for_each_process(|proc| {
-        let mut proc_inner = proc.inner_exclusive_access();
-        let token = proc_inner.memory_set.token();
-        let page_table = PageTable::from_token(token);
-        page_table.collect_ptes().iter_mut()
-            .filter(|(_, pte)| pte.ppn() == old_ppn)
-            .for_each(|(vpn, pte)| {
-              **pte = PageTableEntry::new(new_ppn, pte.flags());
-              proc_inner.memory_set.forget_frame(*vpn);
-            });
-      });
+        replace_ppn_global(old_ppn, new_ppn);
     }
+}
+
+/// Replace all PTE references from old_ppn to new_ppn across all processes.
+pub fn replace_ppn_global(old_ppn: PhysPageNum, new_ppn: PhysPageNum) {
+  for_each_process(|proc| {
+    let mut proc_inner = proc.inner_exclusive_access();
+    let token = proc_inner.memory_set.token();
+    let page_table = PageTable::from_token(token);
+    page_table.collect_ptes().iter_mut()
+        .filter(|(_, pte)| pte.ppn() == old_ppn)
+        .for_each(|(vpn, pte)| {
+          **pte = PageTableEntry::new(new_ppn, pte.flags());
+          proc_inner.memory_set.forget_frame(*vpn);
+        });
+  });
 }
 
 lazy_static! {

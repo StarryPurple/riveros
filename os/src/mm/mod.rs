@@ -8,11 +8,12 @@ mod page_table;
 pub use address::VPNRange;
 pub use address::{PhysAddr, PhysPageNum, StepByOne, VirtAddr, VirtPageNum};
 pub use frame_allocator::{
-    FRAME_ALLOCATOR, FrameTracker, MemoryTier, frame_alloc, frame_alloc_more, frame_alloc_slow,
+    FRAME_ALLOCATOR, FrameTracker, MemoryTier, frame_alloc_fast, frame_alloc, frame_alloc_more,
+    frame_alloc_slow, frame_alloc_slow_route,
     frame_dealloc,
 };
 pub use memory_set::{KERNEL_SPACE, MapArea, MapPermission, MapType, MemorySet, kernel_token};
-pub use page_migrator::PAGE_MIGRATOR;
+pub use page_migrator::{PAGE_MIGRATOR, replace_ppn_global};
 use page_table::PTEFlags;
 pub use page_table::{
     PageTable, PageTableEntry, UserBuffer, translated_byte_buffer, translated_ref,
@@ -39,10 +40,10 @@ pub fn copy_page(src: PhysPageNum, dst: PhysPageNum) {
     let alloc = FRAME_ALLOCATOR.exclusive_access();
     let is_slow = alloc
         .page_tier(src)
-        .map_or(false, |t| matches!(t, MemoryTier::Slow(card_idx)))
+        .map_or(false, |t| matches!(t, MemoryTier::Slow(_)))
         || alloc
             .page_tier(dst)
-            .map_or(false, |t| matches!(t, MemoryTier::Slow(card_idx)));
+            .map_or(false, |t| matches!(t, MemoryTier::Slow(_)));
     drop(alloc);
 
     if is_slow {

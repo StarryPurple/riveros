@@ -1,9 +1,11 @@
-use super::{FrameTracker, frame_alloc, frame_alloc_slow, frame_alloc_slow_any};
+use super::{FrameTracker, frame_alloc, frame_alloc_slow};
 use super::{PTEFlags, PageTable, PageTableEntry};
 use super::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum};
 use super::{StepByOne, VPNRange};
 use crate::config::{CXL_RESERVED_MEMORY_START, MEMORY_END, MMIO, PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT_BASE};
 use crate::sync::UPIntrFreeCell;
+use crate::task::current_process;
+use crate::cxl::CxlCardId;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -322,10 +324,13 @@ impl MapArea {
                 ppn = frame.ppn;
                 self.data_frames.insert(vpn, frame);
             }
-            MapType::FramedSlow => {
-                let frame = frame_alloc_slow_any().unwrap();
+            MapType::FramedCxl(card_id) => {
+                let frame = frame_alloc_slow(card_id).unwrap();
                 ppn = frame.ppn;
                 self.data_frames.insert(vpn, frame);
+                let pid = current_process().getpid();
+                crate::cxl::CXL_CARD_MANAGER.exclusive_access()
+                    .track_page_vpn(ppn, vpn, pid);
             }
             MapType::Linear(pn_offset) => {
                 // check for sv39
@@ -337,8 +342,11 @@ impl MapArea {
         page_table.map(vpn, ppn, pte_flags);
     }
     pub fn unmap_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
-        if self.map_type == MapType::Framed {
-            self.data_frames.remove(&vpn);
+        match self.map_type {
+            MapType::Framed | MapType::FramedCxl(_) => {
+                self.data_frames.remove(&vpn);
+            }
+            _ => {}
         }
         page_table.unmap(vpn);
     }
@@ -380,7 +388,7 @@ impl MapArea {
 pub enum MapType {
     Identical,
     Framed,
-    FramedSlow,
+    FramedCxl(CxlCardId),
     /// offset of page num
     Linear(isize),
 }
