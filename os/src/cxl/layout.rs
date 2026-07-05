@@ -27,6 +27,7 @@ pub const OFF_MAGIC:            usize = 0x000;   // u64
 pub const OFF_N_INSTANCES:      usize = 0x008;   // u32
 pub const OFF_DATA_START:       usize = 0x00C;   // u32
 pub const OFF_TOTAL_PAGES:      usize = 0x010;   // u32
+pub const OFF_BOOTSTRAP_LOCK:   usize = 0x014;   // u32 (1 = init in progress, 0 = done)
 
 // Bakery lock
 pub const OFF_CHOOSING:         usize = 0x040;   // [u8; MAX_INST]
@@ -38,6 +39,13 @@ pub const OFF_FREE_HEAD:        usize = 0x080;   // u32
 
 // Vector clock
 pub const OFF_GLOBAL_VC:        usize = 0x090;   // [u64; MAX_INST]
+
+// GC pending head (index into GC_PENDING_OFF array)
+pub const OFF_GC_HEAD:          usize = 0x0B0;   // u32
+
+// GC pending entry size in the GC_PENDING_OFF region
+pub const GC_ENTRY_SIZE:        usize = 16;
+pub const GC_PENDING_ENTRIES:   usize = 4096;
 
 // Ring buffer (SPSC, 64 slots × 64 B = 4 KB)
 pub const OFF_RING_HEAD:        usize = 0x100;   // u32

@@ -95,3 +95,39 @@ pub fn sys_cxl_meminfo(buf: *mut CxlMemInfo) -> isize {
 
     0
 }
+
+// ── Syscall wrappers for SHM reference counting + GC ──
+
+pub fn sys_shm_alloc_page() -> isize {
+    match crate::cxl::allocator::shm_alloc_page() {
+        Some(idx) => idx as isize,
+        None => -1,
+    }
+}
+
+pub fn sys_shm_free_page(idx: usize) -> isize {
+    crate::cxl::allocator::shm_free_page(idx);
+    0
+}
+
+pub fn sys_shm_ref_page(idx: usize) -> isize {
+    unsafe {
+        crate::cxl::lock::bakery_lock(crate::cxl::allocator::me());
+        crate::cxl::refcnt::shm_ref_page(idx);
+        crate::cxl::lock::bakery_unlock(crate::cxl::allocator::me());
+    }
+    0
+}
+
+pub fn sys_shm_unref_page(idx: usize) -> isize {
+    unsafe {
+        crate::cxl::lock::bakery_lock(crate::cxl::allocator::me());
+        crate::cxl::refcnt::shm_unref_page(idx);
+        crate::cxl::lock::bakery_unlock(crate::cxl::allocator::me());
+    }
+    0
+}
+
+pub fn sys_shm_gc_collect() -> isize {
+    unsafe { crate::cxl::gc::shm_gc_collect() as isize }
+}

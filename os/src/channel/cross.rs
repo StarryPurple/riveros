@@ -5,11 +5,11 @@
 //! know the exact physical offsets, so no registration protocol is needed.
 //!
 //! Layout inside ivshmem BAR:
-//!   0x3F0_0000  Ring 0 (Host → Guest):  8 KB  (header + ~8 KB data)
-//!   0x3F0_2000  Ring 1 (Guest → Host):  8 KB
+//!   0x3F0_0000  Ring 0 (Host -> Guest):  8 KB  (header + ~8 KB data)
+//!   0x3F0_2000  Ring 1 (Guest -> Host):  8 KB
 
 use crate::config::{IVSHMEM_BAR_BASE, PAGE_SIZE};
-use crate::mm::{MapArea, MapPermission, MapType, VirtAddr};
+use crate::mm::{MapArea, MapPermission, MapType, PhysPageNum, VirtAddr, FRAME_ALLOCATOR};
 use crate::sync::UPIntrFreeCell;
 use crate::task::current_process;
 
@@ -19,7 +19,7 @@ pub const CROSS_BASE: usize = 0x3F0_0000;
 pub const RING_SIZE: usize = 0x2000; // 8 KB per ring
 pub const RING_CAPACITY: usize = RING_SIZE - 24; // ~8152 bytes data
 
-pub fn cross_create(vaddr_out: *mut usize) -> isize {
+pub fn sys_cross_create(vaddr_out: *mut usize) -> isize {
     let total = 2 * RING_SIZE; // 16 KB for both rings
     let page_count = (total + PAGE_SIZE - 1) / PAGE_SIZE;
     let pa_base = IVSHMEM_BAR_BASE + CROSS_BASE;
@@ -43,14 +43,24 @@ pub fn cross_create(vaddr_out: *mut usize) -> isize {
         MapPermission::R | MapPermission::W | MapPermission::U,
     );
     inner.memory_set.push(area, None);
+
+    // Pin the cross-ring pages so the page migrator never moves them
+    // (host-side also accesses these pages at the same physical offset)
+    {
+        let mut alloc = FRAME_ALLOCATOR.exclusive_access();
+        for i in 0..page_count {
+            let ppn = PhysPageNum(ppn_base + i);
+            alloc.mark_pinned(ppn);
+        }
+    }
     drop(inner);
 
-    // Init ring 0 (Host → Guest): producer=Host, consumer=Guest
+    // Init ring 0 (Host -> Guest): producer=Host, consumer=Guest
     let r0_pa = pa_base;
     let r0 = unsafe { &*(r0_pa as *const RingHeader) };
     r0.init(RING_CAPACITY as u32);
 
-    // Init ring 1 (Guest → Host): producer=Guest, consumer=Host
+    // Init ring 1 (Guest -> Host): producer=Guest, consumer=Host
     let r1_pa = pa_base + RING_SIZE;
     let r1 = unsafe { &*(r1_pa as *const RingHeader) };
     r1.init(RING_CAPACITY as u32);

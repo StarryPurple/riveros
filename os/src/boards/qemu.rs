@@ -1,6 +1,8 @@
 pub const CLOCK_FREQ: usize = 12500000;
 pub const MEMORY_END: usize = 0x8800_0000;
 
+pub const CXL_SIM_SLOW_MEMORY_START: usize = 0x8600_0000;
+
 pub const IVSHMEM_BAR_BASE: usize = 0x4000_0000;
 pub const IVSHMEM_BAR_SIZE: usize = 0x0400_0000; // 64 MB
 

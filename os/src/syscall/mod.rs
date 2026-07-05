@@ -42,6 +42,12 @@ const SYSCALL_RING_DESTROY: usize = 5002;
 const SYSCALL_RING_WAIT: usize = 5003;
 const SYSCALL_RING_NOTIFY: usize = 5004;
 const SYSCALL_RING_CREATE_CROSS: usize = 5005;
+
+const SYSCALL_SHM_ALLOC_PAGE: usize = 6000;
+const SYSCALL_SHM_FREE_PAGE: usize = 6001;
+const SYSCALL_SHM_REF_PAGE: usize = 6002;
+const SYSCALL_SHM_UNREF_PAGE: usize = 6003;
+const SYSCALL_SHM_GC_COLLECT: usize = 6004;
 const SYSCALL_CXL_RING_PUSH: usize = 4003;
 const SYSCALL_CXL_RING_POP: usize = 4004;
 
@@ -109,7 +115,12 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         SYSCALL_RING_DESTROY => sys_ring_destroy(args[0]),
         SYSCALL_RING_WAIT => sys_ring_wait(args[0], args[1]),
         SYSCALL_RING_NOTIFY => sys_ring_notify(args[0]),
-        SYSCALL_RING_CREATE_CROSS => crate::channel::cross::cross_create(args[1] as *mut usize),
+        SYSCALL_RING_CREATE_CROSS => crate::channel::cross::sys_cross_create(args[1] as *mut usize),
+        SYSCALL_SHM_ALLOC_PAGE => sys_shm_alloc_page(),
+        SYSCALL_SHM_FREE_PAGE => sys_shm_free_page(args[0]),
+        SYSCALL_SHM_REF_PAGE => sys_shm_ref_page(args[0]),
+        SYSCALL_SHM_UNREF_PAGE => sys_shm_unref_page(args[0]),
+        SYSCALL_SHM_GC_COLLECT => sys_shm_gc_collect(),
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     }
 }

@@ -1,5 +1,5 @@
 use super::{PhysAddr, PhysPageNum};
-use crate::config::MEMORY_END;
+use crate::config::{CXL_SIM_SLOW_MEMORY_START, MEMORY_END};
 use crate::sync::UPIntrFreeCell;
 use alloc::collections::BTreeSet;
 use alloc::vec::Vec;
@@ -185,17 +185,18 @@ impl TieredFrameAllocator {
     pub fn mark_pinned(&mut self, ppn: PhysPageNum) {
         self.pinned_pages.insert(ppn);
     }
+    pub fn unpin(&mut self, ppn: PhysPageNum) {
+        self.pinned_pages.remove(&ppn);
+    }
     pub fn is_pinned(&self, ppn: PhysPageNum) -> bool {
         self.pinned_pages.contains(&ppn)
     }
-    /// return None if this is a kernal page
+    /// return None if this is a kernel page
     pub fn page_tier(&self, ppn: PhysPageNum) -> Option<MemoryTier> {
         if self.fast.stack_range().contains(&ppn) {
             return Some(MemoryTier::Fast);
-        } else if let Some(ref slow) = self.slow {
-            if slow.stack_range().contains(&ppn) {
-                return Some(MemoryTier::Slow);
-            }
+        } else if crate::cxl::allocator::is_shm_page(ppn) {
+            return Some(MemoryTier::Slow);
         }
         None
     }
@@ -223,8 +224,9 @@ pub fn init_frame_allocator() {
     let devices = pci_scan();
     if let Some(iv) = devices.iter().find(|d| is_ivshmem(d)) {
         config_ivshmem_bar(iv);
-        let (my_id, _first) = crate::cxl::bootstrap::shm_init();
-        println!("[CXL] ivshmem ready, instance {}", my_id);
+        let my_id = crate::cxl::allocator::me();
+        let (sid, _first) = crate::cxl::bootstrap::shm_init(my_id);
+        println!("[CXL] ivshmem ready, instance {}", sid);
     } else {
         println!("[CXL] no ivshmem found — shared-memory disabled");
     }
@@ -242,11 +244,11 @@ pub fn frame_alloc() -> Option<FrameTracker> {
         .map(FrameTracker::new)
 }
 
+/// Allocate from the CXL slow tier — ivshmem shared memory.
 pub fn frame_alloc_slow() -> Option<FrameTracker> {
-    FRAME_ALLOCATOR
-        .exclusive_access()
-        .alloc_slow()
-        .map(FrameTracker::new)
+    let idx = crate::cxl::allocator::shm_alloc_page()?;
+    let ppn = crate::cxl::allocator::shm_page_to_ppn(idx);
+    Some(FrameTracker::new(ppn))
 }
 
 pub fn frame_alloc_more(num: usize) -> Option<Vec<FrameTracker>> {
@@ -259,6 +261,7 @@ pub fn frame_alloc_more(num: usize) -> Option<Vec<FrameTracker>> {
 pub fn frame_dealloc(ppn: PhysPageNum) {
     if crate::cxl::allocator::is_shm_page(ppn) {
         if let Some(idx) = crate::cxl::allocator::ppn_to_shm_idx(ppn) {
+            FRAME_ALLOCATOR.exclusive_access().unpin(ppn);
             crate::cxl::allocator::shm_free_page(idx);
             return;
         }

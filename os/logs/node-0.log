@@ -1,0 +1,115 @@
+[rustsbi] RustSBI version 0.3.1, adapting to RISC-V SBI v1.0.0
+.______       __    __      _______.___________.  _______..______   __
+|   _  \     |  |  |  |    /       |           | /       ||   _  \ |  |
+|  |_)  |    |  |  |  |   |   (----`---|  |----`|   (----`|  |_)  ||  |
+|      /     |  |  |  |    \   \       |  |      \   \    |   _  < |  |
+|  |\  \----.|  `--'  |.----)   |      |  |  .----)   |   |  |_)  ||  |
+| _| `._____| \______/ |_______/       |__|  |_______/    |______/ |__|
+[rustsbi] Implementation     : RustSBI-QEMU Version 0.2.0-alpha.2
+[rustsbi] Platform Name      : riscv-virtio,qemu
+[rustsbi] Platform SMP       : 1
+[rustsbi] Platform Memory    : 0x80000000..0x88000000
+[rustsbi] Boot HART          : 0
+[rustsbi] Device Tree Region : 0x87e00000..0x87e013a4
+[rustsbi] Firmware Address   : 0x80000000
+[rustsbi] Supervisor Address : 0x80200000
+[rustsbi] pmp01: 0x00000000..0x80000000 (-wr)
+[rustsbi] pmp02: 0x80000000..0x80200000 (---)
+[rustsbi] pmp03: 0x80200000..0x88000000 (xwr)
+[rustsbi] pmp04: 0x88000000..0x00000000 (-wr)
+[CXL] instance 0  joined SHM
+[CXL] ivshmem ready, instance 0
+[34m[ INFO] KERN: init gpu[0m
+[34m[ INFO] Device features EDID | NOTIFY_ON_EMPTY | ANY_LAYOUT | RING_INDIRECT_DESC | RING_EVENT_IDX[0m
+[34m[ INFO] Config: Config { events_read: ReadOnly(Volatile(0)), num_scanouts: Volatile(1) }[0m
+[34m[ INFO] => RespDisplayInfo { header: CtrlHeader { hdr_type: OkDisplayInfo, flags: 0, fence_id: 0, ctx_id: 0, _padding: 0 }, rect: Rect { x: 0, y: 0, width: 1280, height: 800 }, enabled: 1, flags: 0 }[0m
+[34m[ INFO] KERN: init keyboard[0m
+[34m[ INFO] Device features: NOTIFY_ON_EMPTY | ANY_LAYOUT | RING_INDIRECT_DESC | RING_EVENT_IDX[0m
+[34m[ INFO] KERN: init mouse[0m
+[34m[ INFO] Device features: NOTIFY_ON_EMPTY | ANY_LAYOUT | RING_INDIRECT_DESC | RING_EVENT_IDX[0m
+[34m[ INFO] KERN: init trap[0m
+PCI: 2 device(s) found, 0 CXL Type 3, 1 ivshmem
+  ivshmem BAR[2]: base=0x40000000 size=0x4000000
+  ivshmem BAR[3]: base=0x0 size=0x0
+/**** APPS ****
+[34m[ INFO] device features: SEG_MAX | GEOMETRY | BLK_SIZE | SCSI | FLUSH | TOPOLOGY | CONFIG_WCE | DISCARD | WRITE_ZEROES | NOTIFY_ON_EMPTY | RING_INDIRECT_DESC | RING_EVENT_IDX[0m
+[34m[ INFO] config: BlkConfig { capacity: Volatile(65536), size_max: Volatile(0), seg_max: Volatile(254), cylinders: Volatile(65), heads: Volatile(16), sectors: Volatile(63), blk_size: Volatile(512), physical_block_exp: Volatile(0), alignment_offset: Volatile(0), min_io_size: Volatile(0), opt_io_size: Volatile(0) }[0m
+[34m[ INFO] found a block device of size 32768KB[0m
+adder
+adder_atomic
+adder_mutex_blocking
+adder_mutex_spin
+adder_peterson_spin
+adder_peterson_yield
+adder_simple_spin
+adder_simple_yield
+barrier_condvar
+barrier_fail
+cat
+channel_bench_cxl
+cmdline_args
+condsync_condvar
+condsync_sem
+count_lines
+cxl_info
+cxl_ring_test
+eisenberg
+exit
+fantastic_text
+filetest_simple
+forktest
+forktest2
+forktest_simple
+forktree
+gui_move
+gui_shape
+gui_snake
+gui_tri
+hello_world
+huge_write
+huge_write_mt
+infloop
+initproc
+inputdev_event
+matrix
+mmap_cxl
+mpsc_sem
+peterson
+peterson_cxl
+phil_din_mutex
+pipe_large_test
+pipetest
+priv_csr
+priv_inst
+race_adder_arg
+random_num
+ring_basic
+ring_bench
+ring_cross
+run_pipe_test
+shm_bench
+shm_multi_client
+shm_multi_server
+shm_test_all
+shm_test_cross
+shm_test_rc
+sleep
+sleep_simple
+stack_overflow
+stackful_coroutine
+stackless_coroutine
+store_fault
+sync_sem
+tcp_simplehttp
+threads
+threads_arg
+threads_arg_cxl
+udp
+until_timeout
+user_shell
+usertests
+usertests_cxl
+yield
+**************/
+Rust user shell
+>> 

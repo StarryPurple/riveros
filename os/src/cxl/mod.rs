@@ -1,5 +1,8 @@
+pub mod allocator;
+pub mod bootstrap;
+pub mod gc;
+pub mod instance_id;
 pub mod layout;
 pub mod lock;
-pub mod allocator;
+pub mod refcnt;
 pub mod ring;
-pub mod bootstrap;

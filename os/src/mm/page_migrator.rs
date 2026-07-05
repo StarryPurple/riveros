@@ -74,13 +74,13 @@ impl PageMigrator {
                 }
                 Some(MemoryTier::Slow) => {
                     if pte.dirty() {
-                        // dirty once → promote immediately
+                        // dirty once -> promote immediately
                         self.promote_page(ppn, vpn, &page_table, token);
                         self.cold_count.remove(&ppn);
                         self.hot_count.remove(&ppn);
                         pte.clear_dirty();
                     } else if pte.accessed() {
-                        // read → increment hot counter
+                        // read -> increment hot counter
                         pte.clear_accessed();
                         let count = self.hot_count.entry(ppn).or_insert(0);
                         *count += 1;
@@ -129,7 +129,7 @@ impl PageMigrator {
             self.hot_count.insert(new_ppn, count);
         }
     }
-    /// fast -> slow
+    /// fast -> slow (CXL/ivshmem)
     fn demote_page(
         &mut self,
         old_ppn: PhysPageNum,
@@ -137,11 +137,11 @@ impl PageMigrator {
         _page_table: &PageTable,
         _token: usize,
     ) {
-        let new_ppn = FRAME_ALLOCATOR.exclusive_access().alloc_slow();
-        if new_ppn.is_none() {
-            return;
-        }
-        let new_ppn = new_ppn.unwrap();
+        let idx = match crate::cxl::allocator::shm_alloc_page() {
+            Some(i) => i,
+            None => return,
+        };
+        let new_ppn = crate::cxl::allocator::shm_page_to_ppn(idx);
         self.demote_count += 1;
         copy_page(old_ppn, new_ppn);
         self.replace_ppn(old_ppn, new_ppn);

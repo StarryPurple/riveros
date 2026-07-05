@@ -9,6 +9,11 @@ use crate::mm::PhysPageNum;
 
 const FREE_END: u32 = !0u32; // sentinel — end of freelist
 
+// Cross-VM ring resides at SHM data pages starting at this index.
+// Must match channel/cross.rs CROSS_BASE.
+pub const CROSS_RING_PAGE_START: usize = 0x3EE0; // 16096
+pub const CROSS_RING_PAGE_COUNT: usize = 4;
+
 static mut MY_ID: usize = 0;
 
 pub fn set_instance_id(id: usize) {
@@ -16,7 +21,7 @@ pub fn set_instance_id(id: usize) {
 }
 
 #[inline]
-fn me() -> usize {
+pub fn me() -> usize {
     unsafe { MY_ID }
 }
 
@@ -28,10 +33,37 @@ unsafe fn write_freelist(idx: u32, next: u32) {
     unsafe { shm_write32(FREELIST_OFF + idx as usize * 4, next); }
 }
 
+/// Mark the pages used by the cross-VM ring as permanently allocated
+/// so the freelist never hands them out.
+pub unsafe fn reserve_cross_ring_pages() {
+    // Remove the 4 cross-ring pages from the freelist by advancing
+    // the freelist head past them.
+    let mut prev = FREE_END;
+    let mut cur = shm_read32(OFF_FREE_HEAD);
+    for _ in 0..CROSS_RING_PAGE_START {
+        if cur == FREE_END { break; }
+        prev = cur;
+        cur = read_freelist(cur);
+    }
+    // Now cur = first page to remove.  Skip all reserved pages.
+    for _ in 0..CROSS_RING_PAGE_COUNT {
+        if cur == FREE_END { break; }
+        cur = read_freelist(cur);
+    }
+    // Link prev -> cur, effectively cutting out the reserved block.
+    if prev == FREE_END {
+        shm_write32(OFF_FREE_HEAD, cur);
+    } else {
+        write_freelist(prev, cur);
+    }
+    shm_fence();
+}
+
 /// Rewrite freelist as a linked chain of all data pages (first boot).
 pub unsafe fn shm_init_freelist() {
     unsafe {
         shm_write32(OFF_FREE_HEAD, 0u32);
+        shm_write32(OFF_GC_HEAD, 0u32);    // ← zero GC pending head
         let n = DATA_PAGE_COUNT;
         for i in 0..n {
             let next = if i + 1 < n { (i + 1) as u32 } else { FREE_END };
@@ -47,6 +79,7 @@ pub unsafe fn shm_init_freelist() {
 }
 
 /// Allocate one page from the shared region.
+/// Sets ref_count=1 and owner=me.
 pub fn shm_alloc_page() -> Option<usize> {
     unsafe {
         lock::bakery_lock(me());
@@ -57,18 +90,26 @@ pub fn shm_alloc_page() -> Option<usize> {
         }
         let next = read_freelist(head);
         shm_write32(OFF_FREE_HEAD, next);
+        // Init ref_count=1, owner=me
+        shm_write32(REFCOUNT_OFF + head as usize * 4, 1);
+        let owner_ptr = (SHM_BASE + OWNER_OFF + head as usize) as *mut u8;
+        owner_ptr.write_volatile(me() as u8);
+        shm_fence();
         lock::bakery_unlock(me());
         Some(head as usize)
     }
 }
 
-/// Return a previously-allocated page to the shared region.
+/// Decrement a page's reference count.
+/// When refcnt reaches 0 the page enters the GC-pending list.
+/// Call `shm_gc_collect()` later to actually free eligible pages.
 pub fn shm_free_page(idx: usize) {
     unsafe {
         lock::bakery_lock(me());
-        let old_head = shm_read32(OFF_FREE_HEAD);
-        write_freelist(idx as u32, old_head);
-        shm_write32(OFF_FREE_HEAD, idx as u32);
+        super::refcnt::shm_unref_page(idx);
+        // Try to GC immediately — in single-instance this frees right away;
+        // in multi-instance the page stays pending until all peers advance.
+        super::gc::shm_gc_collect();
         lock::bakery_unlock(me());
     }
 }

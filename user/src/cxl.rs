@@ -33,3 +33,19 @@ pub fn cxl_ring_push(data: &[u8; 60]) -> isize {
 pub fn cxl_ring_pop(data: &mut [u8; 60]) -> isize {
     sys_cxl_ring_pop(data as *mut u8)
 }
+
+pub fn shm_alloc_page() -> isize {
+    sys_shm_alloc_page()
+}
+pub fn shm_free_page(idx: usize) -> isize {
+    sys_shm_free_page(idx)
+}
+pub fn shm_ref_page(idx: usize) -> isize {
+    sys_shm_ref_page(idx)
+}
+pub fn shm_unref_page(idx: usize) -> isize {
+    sys_shm_unref_page(idx)
+}
+pub fn shm_gc_collect() -> isize {
+    sys_shm_gc_collect()
+}

@@ -68,6 +68,14 @@ lazy_static! {
 pub fn rust_main() -> ! {
     clear_bss();
     logging::init();
+
+    // Instance ID from build-time env var RINGS_INSTANCE_ID.
+    let my_id = crate::cxl::instance_id::INSTANCE_ID;
+    crate::cxl::allocator::set_instance_id(my_id);
+    if my_id > 0 {
+        println!("[CXL] instance {} (partial mode)", my_id);
+    }
+
     mm::init();
     UART.init();
     info!("KERN: init gpu");

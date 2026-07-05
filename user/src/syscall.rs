@@ -250,3 +250,25 @@ const SYSCALL_RING_CREATE_CROSS: usize = 5005;
 pub fn sys_ring_create_cross(vaddr_out: &mut usize) -> isize {
     syscall(SYSCALL_RING_CREATE_CROSS, [0, vaddr_out as *mut usize as usize, 0])
 }
+
+const SYSCALL_SHM_ALLOC_PAGE: usize = 6000;
+const SYSCALL_SHM_FREE_PAGE: usize = 6001;
+const SYSCALL_SHM_REF_PAGE: usize = 6002;
+const SYSCALL_SHM_UNREF_PAGE: usize = 6003;
+const SYSCALL_SHM_GC_COLLECT: usize = 6004;
+
+pub fn sys_shm_alloc_page() -> isize {
+    syscall(SYSCALL_SHM_ALLOC_PAGE, [0, 0, 0])
+}
+pub fn sys_shm_free_page(idx: usize) -> isize {
+    syscall(SYSCALL_SHM_FREE_PAGE, [idx, 0, 0])
+}
+pub fn sys_shm_ref_page(idx: usize) -> isize {
+    syscall(SYSCALL_SHM_REF_PAGE, [idx, 0, 0])
+}
+pub fn sys_shm_unref_page(idx: usize) -> isize {
+    syscall(SYSCALL_SHM_UNREF_PAGE, [idx, 0, 0])
+}
+pub fn sys_shm_gc_collect() -> isize {
+    syscall(SYSCALL_SHM_GC_COLLECT, [0, 0, 0])
+}

@@ -9,7 +9,7 @@
  *   2. In the guest shell, start the "ring_cross" test
  *   3. Run ./host_bench on the host
  *
- * The guest will spin waiting for a message on ring 0 (Host→Guest).
+ * The guest will spin waiting for a message on ring 0 (Host->Guest).
  * This program sends a message, then waits for the echo on ring 1.
  */
 
@@ -29,8 +29,8 @@
 /* Must match os/src/channel/cross.rs */
 #define CROSS_BASE  0x3F00000UL
 #define RING_SIZE   0x2000UL
-#define CROSS_RING0 CROSS_BASE             /* Host→Guest */
-#define CROSS_RING1 (CROSS_BASE + RING_SIZE) /* Guest→Host */
+#define CROSS_RING0 CROSS_BASE             /* Host->Guest */
+#define CROSS_RING1 (CROSS_BASE + RING_SIZE) /* Guest->Host */
 
 static uint64_t now_us(void) {
     struct timespec ts;

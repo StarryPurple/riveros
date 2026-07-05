@@ -22,8 +22,8 @@ pub fn main() -> i32 {
     }
     println!("Cross rings mapped at vaddr={:#x}", vaddr);
 
-    // Ring 0: Host → Guest (read by guest)
-    // Ring 1: Guest → Host (written by guest)
+    // Ring 0: Host -> Guest (read by guest)
+    // Ring 1: Guest -> Host (written by guest)
     // Each ring is 0x2000 bytes apart
     let ring_h2g = LockFreeRing::new(vaddr as *mut u8);
     let ring_g2h = LockFreeRing::new((vaddr + 0x2000) as *mut u8);
@@ -45,10 +45,10 @@ pub fn main() -> i32 {
     println!("");
 
     loop {
-        // Read from ring 0 (Host→Guest)
+        // Read from ring 0 (Host->Guest)
         match ring_h2g.try_pop(&mut buf) {
             Ok(n) if n == MSG_SIZE => {
-                // Echo back via ring 1 (Guest→Host)
+                // Echo back via ring 1 (Guest->Host)
                 ring_g2h.push_spin(&buf);
 
                 count += 1;

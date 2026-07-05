@@ -174,9 +174,13 @@ pub fn config_ivshmem_bar(device: &PciDevice) -> Option<u64> {
     // Assign BAR base at IVSHMEM_BAR_BASE (after ECAM, before virtio MMIO)
     let new_base: u32 = IVSHMEM_BAR_BASE as u32;
     let offset = 0x10 + (bar_idx as u8) * 4;
-    let flags = read32(device.bus, device.dev, device.func, offset) & 0xF;
+    let raw = read32(device.bus, device.dev, device.func, offset);
+    let flags = raw & 0xF;
     write32(device.bus, device.dev, device.func, offset, new_base | flags);
-    write32(device.bus, device.dev, device.func, offset + 4, 0); // upper 32 bits
+    // Only zero the upper 32 bits if this is a 64-bit BAR
+    if (raw >> 1) & 0x3 == 0x2 {
+        write32(device.bus, device.dev, device.func, offset + 4, 0);
+    }
 
     Some(new_base as u64)
 }
