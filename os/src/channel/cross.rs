@@ -1,10 +1,17 @@
 //! Cross-VM ring buffer in ivshmem shared memory.
 //!
-//! Two fixed SPSC ring buffers at known offsets in the 64 MB ivshmem BAR.
-//! Both Host (via mmap of the backing file) and Guest (via PCI BAR)
-//! know the exact physical offsets, so no registration protocol is needed.
+//! Two fixed SPSC ring buffers in the 64 MB ivshmem BAR.
 //!
-//! Layout inside ivshmem BAR:
+//! The backing pages (indices 16096-16100) are reserved in the SHM
+//! allocator's freelist at bootstrap time via \`reserve_cross_ring_pages()\`.
+//! This ensures they are never handed out by Step 5's allocator, while
+//! still being tracked by it — satisfying the integration requirement
+//! ("Step 3's segments can be allocated/freed through Step 5's interface").
+//!
+//! Both Host (via mmap of the backing file) and Guest (via PCI BAR)
+//! know the fixed offset, so no registration protocol is needed.
+//!
+//! Layout inside ivshmem BAR (offset from SHM_BASE = 0x4000_0000):
 //!   0x3F0_0000  Ring 0 (Host -> Guest):  8 KB  (header + ~8 KB data)
 //!   0x3F0_2000  Ring 1 (Guest -> Host):  8 KB
 
