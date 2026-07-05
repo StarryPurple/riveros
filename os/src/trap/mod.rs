@@ -142,7 +142,7 @@ pub fn trap_return() -> ! {
         unsafe fn __restore();
     }
     let restore_va = linker_symbol_addr!(__restore) - linker_symbol_addr!(__alltraps) + TRAMPOLINE;
-    //println!("before return");
+    // println!("before return");
     unsafe {
         asm!(
             "fence.i",

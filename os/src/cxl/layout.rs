@@ -47,11 +47,16 @@ pub const OFF_GC_HEAD:          usize = 0x0B0;   // u32
 pub const GC_ENTRY_SIZE:        usize = 16;
 pub const GC_PENDING_ENTRIES:   usize = 4096;
 
-// Ring buffer (SPSC, 64 slots × 64 B = 4 KB)
-pub const OFF_RING_HEAD:        usize = 0x100;   // u32
-pub const OFF_RING_TAIL:        usize = 0x104;   // u32
-pub const OFF_RING_ENTRIES:     usize = 0x200;   // [RingEntry; 64]
+// Ring 0 (SPSC, 64 slots × 64 B = 4 KB) — Server->Client
+pub const OFF_TX_HEAD:        usize = 0x100;   // u32
+pub const OFF_TX_TAIL:        usize = 0x104;   // u32
+pub const OFF_TX_ENTRIES:     usize = 0x200;   // [RingEntry; 64]
 pub const RING_CAPACITY:        usize = 64;
+
+// Ring 1 (SPSC, same layout) — Client->Server
+pub const OFF_RX_HEAD:       usize = 0x0C0;   // u32 (was unused in page 0 header)
+pub const OFF_RX_TAIL:       usize = 0x0C4;   // u32
+pub const OFF_RX_ENTRIES:    usize = 0x3F03000; // inside cross ring data area (safe, 4KB)
 
 // Mailbox (single-slot message passing)
 pub const OFF_MBOX_SENDER:      usize = 0x500;   // u32

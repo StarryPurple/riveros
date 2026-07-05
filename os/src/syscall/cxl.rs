@@ -5,7 +5,7 @@ use crate::mm::translated_refmut;
 use core::mem::size_of;
 use crate::task::current_process;
 use crate::config::PAGE_SIZE;
-use crate::mm::{MapArea, MapType, MapPermission};
+use crate::mm::{MapArea, MapType, MapPermission, PageTable};
 use crate::mm::VirtAddr;
 
 /// `size`: the size of the memory to map
@@ -28,8 +28,8 @@ pub fn sys_cxl_munmap(ptr: usize, _size: usize) -> isize {
   0
 }
 
-/// Write 60 bytes into the shared ring buffer (lock-free, non-blocking).
-pub fn sys_cxl_ring_push(buf: *const u8) -> isize {
+/// Write 60 bytes into ring 1 (Client->Server direction).
+pub fn sys_cxl_rx_push(buf: *const u8) -> isize {
     let mut msg = [0u8; crate::cxl::ring::MSG_SIZE];
     let token = current_user_token();
     let src = unsafe { crate::mm::translated_byte_buffer(token, buf, msg.len()) };
@@ -40,12 +40,48 @@ pub fn sys_cxl_ring_push(buf: *const u8) -> isize {
         copied += len;
         if copied >= msg.len() { break; }
     }
-    if unsafe { crate::cxl::ring::push(&msg) } { 0 } else { -1 }
+    if unsafe { crate::cxl::ring::rx_push(&msg) } { 0 } else { -1 }
+}
+
+/// Read 60 bytes from ring 1.
+pub fn sys_cxl_rx_pop(buf: *mut u8) -> isize {
+    let result = unsafe { crate::cxl::ring::rx_pop() };
+    match result {
+        None => -1,
+        Some(msg) => {
+            let token = current_user_token();
+            let mut addr = buf as usize;
+            let remain = msg.len();
+            for i in 0..remain {
+                let vpn = VirtAddr(addr + i).floor();
+                let ppn = PageTable::from_token(token).translate(vpn).unwrap().ppn();
+                let pa = ppn.0 << 12 | ((addr + i) & 0xFFF);
+                let p = pa as *mut u8;
+                unsafe { p.write_volatile(msg[i]); }
+            }
+            0
+        }
+    }
+}
+
+/// Write 60 bytes into the shared ring buffer (lock-free, non-blocking).
+pub fn sys_cxl_tx_push(buf: *const u8) -> isize {
+    let mut msg = [0u8; crate::cxl::ring::MSG_SIZE];
+    let token = current_user_token();
+    let src = unsafe { crate::mm::translated_byte_buffer(token, buf, msg.len()) };
+    let mut copied = 0usize;
+    for seg in src {
+        let len = seg.len().min(msg.len() - copied);
+        msg[copied..copied + len].copy_from_slice(&seg[..len]);
+        copied += len;
+        if copied >= msg.len() { break; }
+    }
+    if unsafe { crate::cxl::ring::tx_push(&msg) } { 0 } else { -1 }
 }
 
 /// Read 60 bytes from the shared ring buffer (lock-free, non-blocking).
-pub fn sys_cxl_ring_pop(buf: *mut u8) -> isize {
-    let result = unsafe { crate::cxl::ring::pop() };
+pub fn sys_cxl_tx_pop(buf: *mut u8) -> isize {
+    let result = unsafe { crate::cxl::ring::tx_pop() };
     match result {
         None => -1,
         Some(msg) => {

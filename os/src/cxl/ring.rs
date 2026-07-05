@@ -12,10 +12,10 @@ pub const MSG_SIZE: usize = 60;
 
 /// Reset the ring to empty (safe to call when no concurrent access).
 pub unsafe fn reset() {
-    unsafe { shm_write32(OFF_RING_HEAD, 0); }
-    unsafe { shm_write32(OFF_RING_TAIL, 0); }
+    unsafe { shm_write32(OFF_TX_HEAD, 0); }
+    unsafe { shm_write32(OFF_TX_TAIL, 0); }
     for slot in 0..RING_CAPACITY {
-        let entry = OFF_RING_ENTRIES + slot * 64;
+        let entry = OFF_TX_ENTRIES + slot * 64;
         let flag = (SHM_BASE + entry) as *mut u32;
         unsafe { flag.write_volatile(0u32); }
     }
@@ -24,16 +24,16 @@ pub unsafe fn reset() {
 /// Write 60 bytes into the ring.
 ///
 /// Returns `true` on success, `false` if the ring is full.
-pub unsafe fn push(data: &[u8; MSG_SIZE]) -> bool {
+pub unsafe fn tx_push(data: &[u8; MSG_SIZE]) -> bool {
     unsafe {
-        let head = shm_read32(OFF_RING_HEAD);
-        let tail = shm_read32(OFF_RING_TAIL);
+        let head = shm_read32(OFF_TX_HEAD);
+        let tail = shm_read32(OFF_TX_TAIL);
 
         if head.wrapping_sub(tail) >= WINDOW {
             // ring appears full — check if it's stale (all flags zero)
             let mut stale = true;
             for slot in 0..RING_CAPACITY {
-                let entry = OFF_RING_ENTRIES + slot * 64;
+                let entry = OFF_TX_ENTRIES + slot * 64;
                 let flag = (SHM_BASE + entry) as *const u32;
                 if flag.read_volatile() != 0 {
                     stale = false;
@@ -42,8 +42,8 @@ pub unsafe fn push(data: &[u8; MSG_SIZE]) -> bool {
             }
             if stale {
                 // previous session left head/tail misaligned; recover
-                shm_write32(OFF_RING_HEAD, 0);
-                shm_write32(OFF_RING_TAIL, 0);
+                shm_write32(OFF_TX_HEAD, 0);
+                shm_write32(OFF_TX_TAIL, 0);
                 crate::println_cxl!("ring recovered from stale state");
             } else {
                 crate::println_cxl!("ring full: head={} tail={}", head, tail);
@@ -51,7 +51,7 @@ pub unsafe fn push(data: &[u8; MSG_SIZE]) -> bool {
             }
         }
         let slot = (head & MASK) as usize;
-        let entry = OFF_RING_ENTRIES + slot * 64; // 4 B flags + 60 B data
+        let entry = OFF_TX_ENTRIES + slot * 64; // 4 B flags + 60 B data
 
         // write data first
         for (i, &b) in data.iter().enumerate() {
@@ -65,7 +65,7 @@ pub unsafe fn push(data: &[u8; MSG_SIZE]) -> bool {
         flag.write_volatile(1u32);
         shm_fence();
 
-        shm_write32(OFF_RING_HEAD, head.wrapping_add(1));
+        shm_write32(OFF_TX_HEAD, head.wrapping_add(1));
         true
     }
 }
@@ -73,15 +73,15 @@ pub unsafe fn push(data: &[u8; MSG_SIZE]) -> bool {
 /// Read 60 bytes from the ring (non-blocking).
 ///
 /// Returns `None` when the ring is empty.
-pub unsafe fn pop() -> Option<[u8; MSG_SIZE]> {
+pub unsafe fn tx_pop() -> Option<[u8; MSG_SIZE]> {
     unsafe {
-        let tail = shm_read32(OFF_RING_TAIL);
-        let head = shm_read32(OFF_RING_HEAD);
+        let tail = shm_read32(OFF_TX_TAIL);
+        let head = shm_read32(OFF_TX_HEAD);
         if head == tail {
             return None;
         }
         let slot = (tail & MASK) as usize;
-        let entry = OFF_RING_ENTRIES + slot * 64;
+        let entry = OFF_TX_ENTRIES + slot * 64;
 
         // wait until the producer has set flag = 1
         let flag = (SHM_BASE + entry) as *const u32;
@@ -101,7 +101,69 @@ pub unsafe fn pop() -> Option<[u8; MSG_SIZE]> {
         flag_mut.write_volatile(0u32);
         shm_fence();
 
-        shm_write32(OFF_RING_TAIL, tail.wrapping_add(1));
+        shm_write32(OFF_TX_TAIL, tail.wrapping_add(1));
+        Some(data)
+    }
+}
+
+// ── Ring 1 (Client->Server direction) ──
+
+/// Sanity: reset head/tail if stale session left garbage.
+unsafe fn sanitize_rx() {
+    let h = shm_read32(OFF_RX_HEAD);
+    let t = shm_read32(OFF_RX_TAIL);
+    if h >= 1024 || t >= 1024 || h < t {
+        shm_write32(OFF_RX_HEAD, 0);
+        shm_write32(OFF_RX_TAIL, 0);
+        for slot in 0..RING_CAPACITY {
+            let entry = OFF_RX_ENTRIES + slot * 64;
+            (SHM_BASE + entry as usize) as *mut u32;
+        }
+        shm_fence();
+    }
+}
+
+pub unsafe fn rx_push(data: &[u8; MSG_SIZE]) -> bool {
+    unsafe {
+        sanitize_rx();
+        let head = shm_read32(OFF_RX_HEAD);
+        let tail = shm_read32(OFF_RX_TAIL);
+        if head.wrapping_sub(tail) >= WINDOW { return false; }
+        let slot = (head & MASK) as usize;
+        let entry = OFF_RX_ENTRIES + slot * 64;
+        for (i, &b) in data.iter().enumerate() {
+            let p = (SHM_BASE + entry + 4 + i) as *mut u8;
+            p.write_volatile(b);
+        }
+        shm_fence();
+        let flag = (SHM_BASE + entry) as *mut u32;
+        flag.write_volatile(1u32);
+        shm_fence();
+        shm_write32(OFF_RX_HEAD, head.wrapping_add(1));
+        true
+    }
+}
+
+pub unsafe fn rx_pop() -> Option<[u8; MSG_SIZE]> {
+    unsafe {
+        sanitize_rx();
+        let tail = shm_read32(OFF_RX_TAIL);
+        let head = shm_read32(OFF_RX_HEAD);
+        if head == tail { return None; }
+        let slot = (tail & MASK) as usize;
+        let entry = OFF_RX_ENTRIES + slot * 64;
+        let flag = (SHM_BASE + entry) as *const u32;
+        while flag.read_volatile() != 1 { shm_fence(); }
+        shm_fence();
+        let mut data = [0u8; MSG_SIZE];
+        for i in 0..MSG_SIZE {
+            let p = (SHM_BASE + entry + 4 + i) as *const u8;
+            data[i] = p.read_volatile();
+        }
+        let flag_mut = (SHM_BASE + entry) as *mut u32;
+        flag_mut.write_volatile(0u32);
+        shm_fence();
+        shm_write32(OFF_RX_TAIL, tail.wrapping_add(1));
         Some(data)
     }
 }

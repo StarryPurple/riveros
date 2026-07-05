@@ -48,8 +48,10 @@ const SYSCALL_SHM_FREE_PAGE: usize = 6001;
 const SYSCALL_SHM_REF_PAGE: usize = 6002;
 const SYSCALL_SHM_UNREF_PAGE: usize = 6003;
 const SYSCALL_SHM_GC_COLLECT: usize = 6004;
-const SYSCALL_CXL_RING_PUSH: usize = 4003;
-const SYSCALL_CXL_RING_POP: usize = 4004;
+const SYSCALL_CXL_TX_PUSH: usize = 4003;
+const SYSCALL_CXL_TX_POP: usize = 4004;
+const SYSCALL_CXL_RX_PUSH: usize = 4005;
+const SYSCALL_CXL_RX_POP: usize = 4006;
 
 mod fs;
 mod gui;
@@ -108,8 +110,10 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         SYSCALL_CXL_MEMINFO => sys_cxl_meminfo(args[0] as *mut CxlMemInfo),
         SYSCALL_CXL_MMAP => sys_cxl_mmap(args[0]),
         SYSCALL_CXL_MUNMAP => sys_cxl_munmap(args[0], args[1]),
-        SYSCALL_CXL_RING_PUSH => sys_cxl_ring_push(args[0] as *const u8),
-        SYSCALL_CXL_RING_POP => sys_cxl_ring_pop(args[0] as *mut u8),
+        SYSCALL_CXL_TX_PUSH => sys_cxl_tx_push(args[0] as *const u8),
+        SYSCALL_CXL_TX_POP => sys_cxl_tx_pop(args[0] as *mut u8),
+        SYSCALL_CXL_RX_PUSH => sys_cxl_rx_push(args[0] as *const u8),
+        SYSCALL_CXL_RX_POP => sys_cxl_rx_pop(args[0] as *mut u8),
         SYSCALL_RING_CREATE => sys_ring_create(args[0], args[1] as *mut usize),
         SYSCALL_RING_MMAP => sys_ring_mmap(args[0]),
         SYSCALL_RING_DESTROY => sys_ring_destroy(args[0]),

@@ -4,7 +4,7 @@
 #[macro_use]
 extern crate user_lib;
 
-use user_lib::{cxl_ring_push, cxl_ring_pop, shm_alloc_page, shm_free_page, shm_gc_collect};
+use user_lib::{cxl_tx_push, cxl_rx_pop, shm_alloc_page, shm_free_page, shm_gc_collect};
 
 const ITERS: usize = 5;
 
@@ -31,15 +31,15 @@ pub fn main() -> i32 {
         let p = p as usize;
         println!("[server] alloc page idx={} (iter {})", p, i);
 
-        // Send page index to client
+        // Send page index via Ring 0 (Server->Client)
         let msg = make_msg(p, 0);
-        while cxl_ring_push(&msg) != 0 {}
-        println!("[server] sent idx {} -> ring", p);
+        while cxl_tx_push(&msg) != 0 {}
+        println!("[server] sent idx {} -> ring 0", p);
 
-        // Wait for ack
+        // Wait for ack via Ring 1 (Client->Server)
         let mut reply = [0u8; 60];
         loop {
-            if cxl_ring_pop(&mut reply) == 0 {
+            if cxl_rx_pop(&mut reply) == 0 {
                 let (ack_idx, kind) = read_idx(&reply);
                 if kind == 1 && ack_idx == p {
                     println!("[server] received ack for idx={}", p);

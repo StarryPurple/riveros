@@ -57,7 +57,7 @@ $(APPS):
 kernel:
 	@echo Platform: $(BOARD)
 	@cp src/linker-$(BOARD).ld src/linker.ld
-	@cargo build --release
+	@RINGS_INSTANCE_ID=0 cargo build --release
 	@rm src/linker.ld
 
 clean:
@@ -94,16 +94,20 @@ QEMU_ARGS := -machine virt \
 # Instance 0 is always started first (initialises SHM).
 QEMU_ARGS_NODE := -machine virt \
 			 -bios $(BOOTLOADER) \
-			 $(GUI_OPTION) \
-			 -drive file=$(FS_IMG),if=none,format=raw,id=x0,snapshot=on \
+			 -drive file=$(FS_IMG),if=none,format=raw,id=x0,snapshot=on,file.locking=off \
 			 -device virtio-blk-device,drive=x0 \
 			 -device virtio-gpu-device \
 			 -device virtio-keyboard-device \
 			 -device virtio-mouse-device \
 			 -device virtio-net-device,netdev=net0 \
 			 -netdev user,id=net0 \
-			 -object memory-backend-file,id=shm0,size=64M,mem-path=../backend-file/cxl.mm,share=on \
+			 -object memory-backend-file,id=shm0,size=64M,mem-path=/dev/shm/cxl.mm,share=on \
 			 -device ivshmem-plain,memdev=shm0
+
+# Create shared-memory file in tmpfs (avoids file-lock conflicts on WSL).
+# Instance 0 initializes SHM; subsequent instances join.
+/dev/shm/cxl.mm:
+	@dd if=/dev/zero of=/dev/shm/cxl.mm bs=1M count=64 2>/dev/null
 
 LOGDIR := logs
 NODE_BASE := -serial file:$(LOGDIR)/node-
@@ -122,30 +126,33 @@ NODE_DIR := target/$(TARGET)/$(MODE)/nodes
 build-node-%: build-user
 	@mkdir -p $(NODE_DIR)
 	@cp src/linker-$(BOARD).ld src/linker.ld
-	@touch src/cxl/instance_id.rs   # force recompilation (option_env! not tracked by cargo)
 	@RINGS_INSTANCE_ID=$* cargo build --release 2>&1 | tail -1
 	@$(OBJCOPY) $(KERNEL_ELF) --strip-all -O binary $(NODE_DIR)/os-node-$*.bin
 	@rm src/linker.ld
 
-run-node-0: build-node-0
+# Clean shared-memory file for a fresh start (instance 0 only).
+fresh-shm:
+	@rm -f /dev/shm/cxl.mm
+	@dd if=/dev/zero of=/dev/shm/cxl.mm bs=1M count=64 2>/dev/null
+
+run-node-0: /dev/shm/cxl.mm fresh-shm build-node-0
 	@qemu-system-riscv64 $(QEMU_ARGS_NODE) \
 		-device loader,file=$(NODE_DIR)/os-node-0.bin,addr=$(KERNEL_ENTRY_PA) \
-		-serial mon:stdio
+		-nographic
 
-run-node-1: build-node-1
+run-node-1: /dev/shm/cxl.mm build-node-1
 	@qemu-system-riscv64 $(QEMU_ARGS_NODE) \
 		-device loader,file=$(NODE_DIR)/os-node-1.bin,addr=$(KERNEL_ENTRY_PA) \
-		-serial mon:stdio
+		-nographic
 
-run-node-2: build-node-2
+run-node-2: /dev/shm/cxl.mm build-node-2
 	@qemu-system-riscv64 $(QEMU_ARGS_NODE) \
 		-device loader,file=$(NODE_DIR)/os-node-2.bin,addr=$(KERNEL_ENTRY_PA) \
-		-serial mon:stdio
+		-nographic
 
 run-multi: build-user
 	@mkdir -p $(LOGDIR) $(NODE_DIR)
 	@echo "Building kernels for 3 instances..."
-	@# Build each node's kernel into a separate binary
 	@for id in 0 1 2; do \
 		cp src/linker-$(BOARD).ld src/linker.ld && \
 		RINGS_INSTANCE_ID=$$id cargo build --release 2>&1 | tail -1 && \
@@ -156,8 +163,8 @@ run-multi: build-user
 	@for id in 0 1 2; do \
 		qemu-system-riscv64 $(QEMU_ARGS_NODE) \
 			-device loader,file=$(NODE_DIR)/os-node-$$id.bin,addr=$(KERNEL_ENTRY_PA) \
-			$(NODE_BASE)$$id.log & \
-		sleep 3; \
+			-nographic &
+		sleep 4; \
 	done
 	@echo "All 3 started, see logs/ for output."
 	@wait

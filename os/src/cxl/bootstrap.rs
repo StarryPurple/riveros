@@ -28,6 +28,10 @@ pub fn shm_init(my_id: usize) -> (usize, bool) {
             shm_write64(OFF_MAGIC, SHM_MAGIC);
             shm_write32(OFF_N_INSTANCES, 0);
             shm_write32(OFF_GC_HEAD, 0);
+            shm_write32(OFF_TX_HEAD, 0);
+            shm_write32(OFF_TX_TAIL, 0);
+            shm_write32(OFF_RX_HEAD, 0);
+            shm_write32(OFF_RX_TAIL, 0);
             shm_write32(OFF_DATA_START, DATA_START as u32);
             shm_write32(OFF_TOTAL_PAGES, DATA_PAGE_COUNT as u32);
             allocator::shm_init_freelist();
@@ -72,7 +76,7 @@ pub fn shm_init(my_id: usize) -> (usize, bool) {
         (my_id, false)
 
     } else {
-        // ── SHM already exists, join ──
+        // SHM already exists, join
         // Clear stale GC head from previous session
         unsafe { shm_write32(OFF_GC_HEAD, 0); }
         unsafe { reset_bakery_id(my_id); }

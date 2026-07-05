@@ -26,12 +26,18 @@ pub fn cxl_munmap(ptr: usize, size: usize) -> isize {
     sys_cxl_munmap(ptr, size)
 }
 
-pub fn cxl_ring_push(data: &[u8; 60]) -> isize {
-    sys_cxl_ring_push(data as *const u8)
+pub fn cxl_tx_push(data: &[u8; 60]) -> isize {
+    sys_cxl_tx_push(data as *const u8)
 }
 
-pub fn cxl_ring_pop(data: &mut [u8; 60]) -> isize {
-    sys_cxl_ring_pop(data as *mut u8)
+pub fn cxl_tx_pop(data: &mut [u8; 60]) -> isize {
+    sys_cxl_tx_pop(data as *mut u8)
+}
+pub fn cxl_rx_push(data: &[u8; 60]) -> isize {
+    sys_cxl_rx_push(data as *const u8)
+}
+pub fn cxl_rx_pop(data: &mut [u8; 60]) -> isize {
+    sys_cxl_rx_pop(data as *mut u8)
 }
 
 pub fn shm_alloc_page() -> isize {

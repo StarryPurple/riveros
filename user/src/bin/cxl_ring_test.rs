@@ -5,7 +5,7 @@
 extern crate user_lib;
 extern crate alloc;
 
-use user_lib::{cxl_ring_push, cxl_ring_pop, fork, waitpid, exit};
+use user_lib::{cxl_tx_push, cxl_tx_pop, fork, waitpid, exit};
 
 #[unsafe(no_mangle)]
 pub fn main() -> i32 {
@@ -19,10 +19,10 @@ pub fn main() -> i32 {
         m[..text.len()].copy_from_slice(text);
         m
     };
-    let ret = cxl_ring_push(&msg);
+    let ret = cxl_tx_push(&msg);
     assert!(ret == 0, "push failed: {}", ret);
     let mut out = [0u8; 60];
-    let ret = cxl_ring_pop(&mut out);
+    let ret = cxl_tx_pop(&mut out);
     assert!(ret == 0, "pop failed: {}", ret);
     assert_eq!(out, msg, "data mismatch on round-trip");
     println!("round-trip: OK  (pushed '{:?}', got '{:?}')",
@@ -36,7 +36,7 @@ pub fn main() -> i32 {
         // ── child: busy-pop until we receive a quit marker ──
         let mut buf = [0u8; 60];
         loop {
-            while cxl_ring_pop(&mut buf) != 0 {
+            while cxl_tx_pop(&mut buf) != 0 {
                 // busy-poll
             }
             if buf[0] == 0xFF {
@@ -53,12 +53,12 @@ pub fn main() -> i32 {
     for i in 0..50 {
         payload[0] = 0xAA;
         payload[1] = i as u8;
-        while cxl_ring_push(&payload) != 0 {
+        while cxl_tx_push(&payload) != 0 {
             // spin until space available
         }
     }
     payload[0] = 0xFF; // quit marker
-    while cxl_ring_push(&payload) != 0 {}
+    while cxl_tx_push(&payload) != 0 {}
 
     let mut code = 0i32;
     waitpid(pid as usize, &mut code);
