@@ -21,6 +21,7 @@ mod board;
 
 #[macro_use]
 mod console;
+mod channel;
 mod config;
 mod cxl;
 mod drivers;

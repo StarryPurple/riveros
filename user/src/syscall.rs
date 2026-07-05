@@ -218,3 +218,29 @@ pub fn sys_cxl_ring_push(buf: *const u8) -> isize {
 pub fn sys_cxl_ring_pop(buf: *mut u8) -> isize {
     syscall(SYSCALL_CXL_RING_POP, [buf as usize, 0, 0])
 }
+
+const SYSCALL_RING_CREATE: usize = 5000;
+const SYSCALL_RING_MMAP: usize = 5001;
+const SYSCALL_RING_DESTROY: usize = 5002;
+const SYSCALL_RING_WAIT: usize = 5003;
+const SYSCALL_RING_NOTIFY: usize = 5004;
+
+pub fn sys_ring_create(capacity: usize, vaddr_out: *mut usize) -> isize {
+    syscall(SYSCALL_RING_CREATE, [capacity, vaddr_out as usize, 0])
+}
+
+pub fn sys_ring_mmap(fd: usize) -> isize {
+    syscall(SYSCALL_RING_MMAP, [fd, 0, 0])
+}
+
+pub fn sys_ring_destroy(fd: usize) -> isize {
+    syscall(SYSCALL_RING_DESTROY, [fd, 0, 0])
+}
+
+pub fn sys_ring_wait(fd: usize, timeout_ms: usize) -> isize {
+    syscall(SYSCALL_RING_WAIT, [fd, timeout_ms, 0])
+}
+
+pub fn sys_ring_notify(fd: usize) -> isize {
+    syscall(SYSCALL_RING_NOTIFY, [fd, 0, 0])
+}

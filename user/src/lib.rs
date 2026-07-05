@@ -18,6 +18,7 @@ mod syscall;
 mod task;
 mod cxl;
 mod channel;
+mod ring;
 
 extern crate alloc;
 #[macro_use]
@@ -31,10 +32,11 @@ pub use file::*;
 pub use io::*;
 pub use net::*;
 pub use sync::*;
-use syscall::*;
+pub use syscall::*;
 pub use task::*;
 pub use cxl::*;
 pub use channel::*;
+pub use ring::*;
 
 unsafe extern "Rust" {
     fn main(argc: usize, argv: &[&str]) -> i32;
