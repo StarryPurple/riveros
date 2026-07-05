@@ -134,58 +134,77 @@ impl LockFreeRing {
         }
     }
 
+    /// After a successful operation, wake the peer if it is waiting.
+    /// Clears the peer's flag (so the notification is consumed exactly once)
+    /// then calls sys_ring_notify.
+    fn notify_peer(&self, peer_flag: u32, fd: usize) {
+        if self.header().flags.load(Ordering::Acquire) & peer_flag != 0 {
+            self.header().flags.fetch_and(!peer_flag, Ordering::Release);
+            sys_ring_notify(fd);
+        }
+    }
+
     /// Hybrid send: spin then fall back to kernel notification.
     pub fn push_hybrid(&self, data: &[u8], max_spin: usize, fd: usize) {
-        for _ in 0..max_spin {
+        loop {
+            for _ in 0..max_spin {
+                if let Ok(()) = self.try_push(data) {
+                    self.notify_peer(RING_F_NEED_WAKE_C, fd);
+                    return;
+                }
+                core::hint::spin_loop();
+            }
+
+            // Register our interest
+            self.header()
+                .flags
+                .fetch_or(RING_F_NEED_WAKE_P, Ordering::Release);
+
+            // Final check before blocking (missed-wakeup avoidance)
             if let Ok(()) = self.try_push(data) {
+                self.header()
+                    .flags
+                    .fetch_and(!RING_F_NEED_WAKE_P, Ordering::Release);
+                self.notify_peer(RING_F_NEED_WAKE_C, fd);
                 return;
             }
-            core::hint::spin_loop();
-        }
 
-        self.header()
-            .flags
-            .fetch_or(RING_F_NEED_WAKE_P, Ordering::Release);
-
-        if let Ok(()) = self.try_push(data) {
+            // Block — woken by consumer's notify_peer after it pops
+            sys_ring_wait(fd, 0);
             self.header()
                 .flags
                 .fetch_and(!RING_F_NEED_WAKE_P, Ordering::Release);
-            return;
         }
-
-        sys_ring_wait(fd, 0);
-        self.header()
-            .flags
-            .fetch_and(!RING_F_NEED_WAKE_P, Ordering::Release);
-        self.push_hybrid(data, max_spin, fd);
     }
 
     /// Hybrid recv: spin then fall back to kernel notification.
     pub fn pop_hybrid(&self, buf: &mut [u8], max_spin: usize, fd: usize) -> usize {
-        for _ in 0..max_spin {
+        loop {
+            for _ in 0..max_spin {
+                if let Ok(n) = self.try_pop(buf) {
+                    self.notify_peer(RING_F_NEED_WAKE_P, fd);
+                    return n;
+                }
+                core::hint::spin_loop();
+            }
+
+            self.header()
+                .flags
+                .fetch_or(RING_F_NEED_WAKE_C, Ordering::Release);
+
             if let Ok(n) = self.try_pop(buf) {
+                self.header()
+                    .flags
+                    .fetch_and(!RING_F_NEED_WAKE_C, Ordering::Release);
+                self.notify_peer(RING_F_NEED_WAKE_P, fd);
                 return n;
             }
-            core::hint::spin_loop();
-        }
 
-        self.header()
-            .flags
-            .fetch_or(RING_F_NEED_WAKE_C, Ordering::Release);
-
-        if let Ok(n) = self.try_pop(buf) {
+            sys_ring_wait(fd, 0);
             self.header()
                 .flags
                 .fetch_and(!RING_F_NEED_WAKE_C, Ordering::Release);
-            return n;
         }
-
-        sys_ring_wait(fd, 0);
-        self.header()
-            .flags
-            .fetch_and(!RING_F_NEED_WAKE_C, Ordering::Release);
-        self.pop_hybrid(buf, max_spin, fd)
     }
 
     pub fn is_empty(&self) -> bool {
