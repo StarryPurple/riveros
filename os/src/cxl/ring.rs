@@ -144,17 +144,36 @@ pub unsafe fn rx_push(data: &[u8; MSG_SIZE]) -> bool {
     }
 }
 
+/// Block until data is available, then read it.
+/// Never returns `None` — instead waits with `wfi`.
+/// `wfi` causes TCG to exit the current translation block,
+/// avoiding the TB-caching issue with cross-QEMU reads.
 pub unsafe fn rx_pop() -> Option<[u8; MSG_SIZE]> {
     unsafe {
         sanitize_rx();
-        let tail = shm_read32(OFF_RX_TAIL);
-        let head = shm_read32(OFF_RX_HEAD);
-        if head == tail { return None; }
-        let slot = (tail & MASK) as usize;
-        let entry = OFF_RX_ENTRIES + slot * 64;
+        // Phase 1: wait for data (head != tail)
+        let mut tail;
+        let entry;
+        loop {
+            tail = shm_read32(OFF_RX_TAIL);
+            let head = shm_read32(OFF_RX_HEAD);
+            if head != tail {
+                entry = OFF_RX_ENTRIES + ((tail & MASK) as usize) * 64;
+                break;
+            }
+            // wfi: exit TB, preventing TCG from caching the tight loop.
+            core::arch::asm!("wfi", options(nostack));
+            shm_fence();
+        }
+
+        // Phase 2: wait for slot flag
         let flag = (SHM_BASE + entry) as *const u32;
-        while flag.read_volatile() != 1 { shm_fence(); }
+        while flag.read_volatile() != 1 {
+            core::arch::asm!("wfi", options(nostack));
+            shm_fence();
+        }
         shm_fence();
+
         let mut data = [0u8; MSG_SIZE];
         for i in 0..MSG_SIZE {
             let p = (SHM_BASE + entry + 4 + i) as *const u8;

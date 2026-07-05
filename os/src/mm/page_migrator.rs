@@ -120,7 +120,7 @@ impl PageMigrator {
         unsafe {
             asm!("sfence.vma");
         }
-        // println_cxl!("promote_page: old_ppn={:#x}, new_ppn={:#x}", old_ppn.0, new_ppn.0);
+        println_cxl!("promote_page: old_ppn={:#x}, new_ppn={:#x}", old_ppn.0, new_ppn.0);
         frame_dealloc(old_ppn);
         if let Some(count) = self.cold_count.remove(&old_ppn) {
             self.cold_count.insert(new_ppn, count);
@@ -148,7 +148,7 @@ impl PageMigrator {
         unsafe {
             asm!("sfence.vma");
         }
-        // println_cxl!("demote_page: old_ppn={:#x}, new_ppn={:#x}", old_ppn.0, new_ppn.0);
+        println_cxl!("demote_page: old_ppn={:#x}, new_ppn={:#x}", old_ppn.0, new_ppn.0);
         frame_dealloc(old_ppn);
         if let Some(count) = self.cold_count.remove(&old_ppn) {
             self.cold_count.insert(new_ppn, count);
