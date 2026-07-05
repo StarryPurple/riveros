@@ -9,7 +9,7 @@ use core::sync::atomic::Ordering;
 use lazy_static::*;
 
 use crate::config::PAGE_SIZE;
-use crate::mm::{MapArea, MapPermission, MapType, PhysPageNum, VirtAddr, frame_alloc};
+use crate::mm::{MapArea, MapPermission, MapType, PhysPageNum, VirtAddr, VirtPageNum, FRAME_ALLOCATOR};
 use crate::sync::UPIntrFreeCell;
 use crate::task::{TaskControlBlock, block_current_and_run_next, current_task, wakeup_task};
 
@@ -52,6 +52,19 @@ pub fn ring_create(capacity: usize) -> (isize, usize) {
         MapPermission::R | MapPermission::W | MapPermission::U,
     );
     inner.memory_set.push(area, None);
+
+    // Pin all ring pages — page migrator must not move them
+    {
+        let mut alloc = FRAME_ALLOCATOR.exclusive_access();
+        let start_vpn = start_va.floor().0;
+        let end_vpn = start_vpn + page_count;
+        for vpn_i in start_vpn..end_vpn {
+            let vpn = VirtPageNum::from(vpn_i);
+            if let Some(pte) = inner.memory_set.translate(vpn) {
+                alloc.mark_pinned(pte.ppn());
+            }
+        }
+    }
 
     // Retrieve the PPN of the first mapped page via page table
     let pte = inner.memory_set.translate(start_va.floor()).unwrap();

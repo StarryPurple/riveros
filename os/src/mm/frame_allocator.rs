@@ -1,6 +1,7 @@
 use super::{PhysAddr, PhysPageNum};
 use crate::config::MEMORY_END;
 use crate::sync::UPIntrFreeCell;
+use alloc::collections::BTreeSet;
 use alloc::vec::Vec;
 use core::fmt::{self, Debug, Formatter};
 use core::ops::Range;
@@ -107,6 +108,7 @@ pub enum MemoryTier {
 pub struct TieredFrameAllocator {
     fast: StackFrameAllocator,
     slow: Option<StackFrameAllocator>,
+    pinned_pages: BTreeSet<PhysPageNum>,
 
     /// Statistics
     pub fast_alloc_count: u64,
@@ -120,6 +122,7 @@ impl TieredFrameAllocator {
         Self {
             fast: StackFrameAllocator::new(),
             slow: None,
+            pinned_pages: BTreeSet::new(),
             fast_alloc_count: 0,
             slow_alloc_count: 0,
             fast_dealloc_count: 0,
@@ -165,6 +168,7 @@ impl TieredFrameAllocator {
         Some(result)
     }
     pub fn dealloc(&mut self, ppn: PhysPageNum) {
+        self.pinned_pages.remove(&ppn);
         if self.fast.stack_range().contains(&ppn) {
             self.fast_dealloc_count += 1;
             self.fast.dealloc(ppn);
@@ -177,6 +181,12 @@ impl TieredFrameAllocator {
             }
         }
         panic!("Frame ppn={:#x} is not in fast or slow tier", ppn.0);
+    }
+    pub fn mark_pinned(&mut self, ppn: PhysPageNum) {
+        self.pinned_pages.insert(ppn);
+    }
+    pub fn is_pinned(&self, ppn: PhysPageNum) -> bool {
+        self.pinned_pages.contains(&ppn)
     }
     /// return None if this is a kernal page
     pub fn page_tier(&self, ppn: PhysPageNum) -> Option<MemoryTier> {
