@@ -28,3 +28,4 @@ pushall.sh
 /.copilot/
 
 /docs/*
+/backend-file/*
