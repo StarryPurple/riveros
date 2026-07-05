@@ -41,6 +41,7 @@ const SYSCALL_RING_MMAP: usize = 5001;
 const SYSCALL_RING_DESTROY: usize = 5002;
 const SYSCALL_RING_WAIT: usize = 5003;
 const SYSCALL_RING_NOTIFY: usize = 5004;
+const SYSCALL_RING_CREATE_CROSS: usize = 5005;
 const SYSCALL_CXL_RING_PUSH: usize = 4003;
 const SYSCALL_CXL_RING_POP: usize = 4004;
 
@@ -108,6 +109,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         SYSCALL_RING_DESTROY => sys_ring_destroy(args[0]),
         SYSCALL_RING_WAIT => sys_ring_wait(args[0], args[1]),
         SYSCALL_RING_NOTIFY => sys_ring_notify(args[0]),
+        SYSCALL_RING_CREATE_CROSS => crate::channel::cross::cross_create(args[1] as *mut usize),
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     }
 }

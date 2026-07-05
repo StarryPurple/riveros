@@ -244,3 +244,9 @@ pub fn sys_ring_wait(fd: usize, timeout_ms: usize) -> isize {
 pub fn sys_ring_notify(fd: usize) -> isize {
     syscall(SYSCALL_RING_NOTIFY, [fd, 0, 0])
 }
+
+const SYSCALL_RING_CREATE_CROSS: usize = 5005;
+
+pub fn sys_ring_create_cross(vaddr_out: &mut usize) -> isize {
+    syscall(SYSCALL_RING_CREATE_CROSS, [0, vaddr_out as *mut usize as usize, 0])
+}
