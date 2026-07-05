@@ -92,8 +92,8 @@ pub fn shm_init(my_id: usize) -> (usize, bool) {
 /// Reset this instance's bakery state (choosing=0, number=0).
 unsafe fn reset_bakery_id(me: usize) {
     if me >= MAX_INSTANCES { panic!("instance ID {} out of range", me); }
-    shm_write64(OFF_NUMBER + me * 8, 0);
+    unsafe { shm_write64(OFF_NUMBER + me * 8, 0) };
     let p = (SHM_BASE + OFF_CHOOSING + me) as *mut u8;
-    p.write_volatile(0u8);
-    shm_fence();
+    unsafe { p.write_volatile(0u8) };
+    unsafe { shm_fence() };
 }

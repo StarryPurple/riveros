@@ -30,7 +30,7 @@ unsafe fn gc_pending_push(idx: usize, owner: u8) {
     let ptr = (SHM_BASE + entry_off + 12) as *mut u8;
     ptr.write_volatile(flags);
     shm_fence();
-    // Advance head
+    // head += 1
     shm_write32(OFF_GC_HEAD, (head + 1) as u32);
     shm_fence();
 }
@@ -59,7 +59,7 @@ pub unsafe fn shm_unref_page(idx: usize) {
         let owner = owner_ptr.read_volatile();
         let me = super::allocator::me();
         if owner == me as u8 || owner == 0 {
-            // I am the owner -> push to GC pending
+            // is the owner -> push to GC pending
             gc_pending_push(idx, owner);
         }
         // If not the owner, the GC (run by owner) will collect later

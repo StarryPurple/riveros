@@ -106,7 +106,7 @@ pub unsafe fn tx_pop() -> Option<[u8; MSG_SIZE]> {
     }
 }
 
-// ── Ring 1 (Client->Server direction) ──
+// ── Ring RX (Client->Server direction) ──
 
 /// Sanity: reset head/tail if stale session left garbage.
 unsafe fn sanitize_rx() {

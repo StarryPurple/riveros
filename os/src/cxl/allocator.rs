@@ -39,24 +39,24 @@ pub unsafe fn reserve_cross_ring_pages() {
     // Remove the 4 cross-ring pages from the freelist by advancing
     // the freelist head past them.
     let mut prev = FREE_END;
-    let mut cur = shm_read32(OFF_FREE_HEAD);
+    let mut cur = unsafe { shm_read32(OFF_FREE_HEAD) };
     for _ in 0..CROSS_RING_PAGE_START {
         if cur == FREE_END { break; }
         prev = cur;
-        cur = read_freelist(cur);
+        cur = unsafe { read_freelist(cur) };
     }
     // Now cur = first page to remove.  Skip all reserved pages.
     for _ in 0..CROSS_RING_PAGE_COUNT {
         if cur == FREE_END { break; }
-        cur = read_freelist(cur);
+        cur = unsafe { read_freelist(cur) };
     }
     // Link prev -> cur, effectively cutting out the reserved block.
     if prev == FREE_END {
-        shm_write32(OFF_FREE_HEAD, cur);
+        unsafe { shm_write32(OFF_FREE_HEAD, cur) };
     } else {
-        write_freelist(prev, cur);
+        unsafe { write_freelist(prev, cur) };
     }
-    shm_fence();
+    unsafe { shm_fence() };
 }
 
 /// Rewrite freelist as a linked chain of all data pages (first boot).

@@ -47,13 +47,13 @@ pub const OFF_GC_HEAD:          usize = 0x0B0;   // u32
 pub const GC_ENTRY_SIZE:        usize = 16;
 pub const GC_PENDING_ENTRIES:   usize = 4096;
 
-// Ring 0 (SPSC, 64 slots × 64 B = 4 KB) — Server->Client
+// Ring TX (SPSC, 64 slots × 64 B = 4 KB) — Server->Client
 pub const OFF_TX_HEAD:        usize = 0x100;   // u32
 pub const OFF_TX_TAIL:        usize = 0x104;   // u32
 pub const OFF_TX_ENTRIES:     usize = 0x200;   // [RingEntry; 64]
 pub const RING_CAPACITY:        usize = 64;
 
-// Ring 1 (SPSC, same layout) — Client->Server
+// Ring RX (SPSC, same layout) — Client->Server
 pub const OFF_RX_HEAD:       usize = 0x0C0;   // u32 (was unused in page 0 header)
 pub const OFF_RX_TAIL:       usize = 0x0C4;   // u32
 pub const OFF_RX_ENTRIES:    usize = 0x3F03000; // inside cross ring data area (safe, 4KB)
@@ -65,10 +65,10 @@ pub const OFF_MBOX_READY:       usize = 0x508;   // u32
 
 // ── Metadata array pages (Pages 1..31) ──
 //
-// Page 1..7    frelelist:     [u32; DATA_PAGE_COUNT]   (64 KB)
+// Page 1..7    freelist:      [u32; DATA_PAGE_COUNT]   (64 KB)
 // Page 8..14   ref_count:     [u32; DATA_PAGE_COUNT]   (64 KB)
 // Page 15      owner:         [u8;  DATA_PAGE_COUNT]   (16 KB)
-// Page 16..31  GC pending:    [PendingEntry; N]         (64 KB)
+// Page 16..31  GC pending:    [PendingEntry; N]        (64 KB)
 
 pub const FREELIST_PAGE:        usize = 1;
 pub const REFCOUNT_PAGE:        usize = 8;
