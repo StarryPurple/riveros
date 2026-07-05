@@ -31,6 +31,8 @@ static SUCC_TESTS: &[(&str, &str, &str, &str, i32)] = &[
     ("adder_peterson_yield\0", "\0", "\0", "\0", 0),
     ("adder_mutex_blocking\0", "\0", "\0", "\0", 0),
     ("adder_mutex_spin\0", "\0", "\0", "\0", 0),
+    ("ring_basic\0", "\0", "\0", "\0", 0),
+    ("ring_bench\0", "\0", "\0", "\0", 0),
     ("run_pipe_test\0", "\0", "\0", "\0", 0),
     ("sleep_simple\0", "\0", "\0", "\0", 0),
     ("sleep\0", "\0", "\0", "\0", 0),

@@ -48,9 +48,12 @@ impl PageMigrator {
         let ptes = page_table.collect_ptes();
         for (vpn, pte) in ptes {
             let ppn = pte.ppn();
-            let alloc = FRAME_ALLOCATOR.exclusive_access();
-            if alloc.is_pinned(ppn) { continue; }
-            let tier = alloc.page_tier(ppn);
+            // Short-lived borrow for pin check + tier query — released before match
+            let (pinned, tier) = {
+                let alloc = FRAME_ALLOCATOR.exclusive_access();
+                (alloc.is_pinned(ppn), alloc.page_tier(ppn))
+            };
+            if pinned { continue; }
             match tier {
                 Some(MemoryTier::Fast) => {
                     if !pte.accessed() && !pte.dirty() {
