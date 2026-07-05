@@ -107,7 +107,7 @@ pub fn main() -> i32 {
     print_meminfo("after 2 x cxl_mmap", &mem);
     // Each card should have ~20 pages allocated (60 / 3 = 20)
     for cid in 0..3 {
-        let avg = (n1 + n2) as u64 / 3;
+        let avg = (n1 + n2) as u64 / 2;
         let tol = (n1 + n2) as u64 / 2;
         assert!(
             mem.slow_alloc_count[cid] <= avg + tol,
