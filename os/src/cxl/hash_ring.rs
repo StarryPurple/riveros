@@ -43,20 +43,24 @@ impl VnodeIdPool {
     }
 }
 
+/// SplitMix64 — passes BigCrush, excellent avalanche, fast.
+#[inline]
+fn splitmix64(mut x: u64) -> u64 {
+    x = x.wrapping_add(0x9e3779b97f4a7c15);
+    x = (x ^ (x >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
+    x = (x ^ (x >> 27)).wrapping_mul(0x94d049bb133111eb);
+    x ^ (x >> 31)
+}
+
 /// Compute the ring position for a virtual node.
 fn vnode_ring_pos(card_id: CxlCardId, vnode_id: VnodeId) -> HashValue {
-    let mut h = card_id.0 as u64;
-    h = h.wrapping_mul(0x9e3779b97f4a7c15);
-    h ^= vnode_id.0;
-    HashValue(h.wrapping_mul(0x9e3779b97f4a7c15))
+    let seed = (card_id.0 as u64).wrapping_mul(VNODES_PER_CARD as u64) ^ vnode_id.0;
+    HashValue(splitmix64(seed))
 }
 
 /// Hash a user-provided key to a ring position.
 fn hash_key(key: u64) -> HashValue {
-    let mut h = key;
-    h = h.wrapping_mul(0x9e3779b97f4a7c15);
-    h ^= h >> 31;
-    HashValue(h.wrapping_mul(0x9e3779b97f4a7c15))
+    HashValue(splitmix64(key))
 }
 
 pub struct HashRing {

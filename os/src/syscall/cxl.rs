@@ -30,8 +30,7 @@ pub fn sys_cxl_mmap(size: usize) -> isize {
       Some(c) => c,
       None => return -2, // no CXL card available
   };
-  let area = MapArea::new(start_va, end_va, MapType::FramedCxl(card_id), MapPermission::R | MapPermission::W | MapPermission::U);
-  inner.memory_set.push(area, None);
+  inner.memory_set.push_cxl_fallback(start_va, end_va, card_id, MapPermission::R | MapPermission::W | MapPermission::U);
   start_va.0 as isize
 }
 

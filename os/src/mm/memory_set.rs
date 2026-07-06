@@ -86,6 +86,16 @@ impl MemorySet {
         }
         self.areas.push(map_area);
     }
+    /// Try to push a `FramedCxl` area; fallback to `Framed` (DRAM)
+    /// if the CXL card is exhausted. Returns the start VA.
+    pub fn push_cxl_fallback(&mut self, start_va: VirtAddr, end_va: VirtAddr, card_id: CxlCardId, perm: MapPermission) {
+        let mut area = MapArea::new(start_va, end_va, MapType::FramedCxl(card_id), perm);
+        if !area.try_map(&mut self.page_table) {
+            area = MapArea::new(start_va, end_va, MapType::Framed, perm);
+            area.map(&mut self.page_table);
+        }
+        self.areas.push(area);
+    }
     /// Mention that trampoline is not collected by areas.
     fn map_trampoline(&mut self) {
         self.page_table.map(
@@ -349,6 +359,55 @@ impl MapArea {
             _ => {}
         }
         page_table.unmap(vpn);
+    }
+    /// Like map_one but returns false on allocation failure (used for fallback).
+    pub fn try_map_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) -> bool {
+        let ppn: PhysPageNum;
+        match self.map_type {
+            MapType::Identical => {
+                ppn = PhysPageNum(vpn.0);
+            }
+            MapType::Framed => {
+                let frame = match frame_alloc() {
+                    Some(f) => f,
+                    None => return false,
+                };
+                ppn = frame.ppn;
+                self.data_frames.insert(vpn, frame);
+            }
+            MapType::FramedCxl(card_id) => {
+                let frame = match frame_alloc_slow(card_id) {
+                    Some(f) => f,
+                    None => return false,
+                };
+                ppn = frame.ppn;
+                self.data_frames.insert(vpn, frame);
+                let pid = current_process().getpid();
+                crate::cxl::CXL_CARD_MANAGER.exclusive_access()
+                    .track_page_vpn(ppn, vpn, pid);
+            }
+            MapType::Linear(pn_offset) => {
+                assert!(vpn.0 < (1usize << 27));
+                ppn = PhysPageNum((vpn.0 as isize + pn_offset) as usize);
+            }
+        }
+        let pte_flags = PTEFlags::from_bits(self.map_perm.bits).unwrap();
+        page_table.map(vpn, ppn, pte_flags);
+        true
+    }
+    /// Like map but returns false on first allocation failure,
+    /// undoing pages already mapped so the area can be retried.
+    pub fn try_map(&mut self, page_table: &mut PageTable) -> bool {
+        for vpn in self.vpn_range {
+            if !self.try_map_one(page_table, vpn) {
+                for prev in self.vpn_range {
+                    if prev >= vpn { break; }
+                    self.unmap_one(page_table, prev);
+                }
+                return false;
+            }
+        }
+        true
     }
     pub fn map(&mut self, page_table: &mut PageTable) {
         for vpn in self.vpn_range {
