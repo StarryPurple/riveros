@@ -51,7 +51,7 @@ pub unsafe fn shm_ref_page(idx: usize) {
 pub unsafe fn shm_unref_page(idx: usize) {
     let rc_ptr = (SHM_BASE + REFCOUNT_OFF + idx * 4) as *mut u32;
     let rc = rc_ptr.read_volatile();
-    if rc <= 1 {
+    if rc == 1 {
         // Last reference dropped
         rc_ptr.write_volatile(0);
         shm_fence();
@@ -63,8 +63,9 @@ pub unsafe fn shm_unref_page(idx: usize) {
             gc_pending_push(idx, owner);
         }
         // If not the owner, the GC (run by owner) will collect later
-    } else {
+    } else if rc > 1 {
         rc_ptr.write_volatile(rc - 1);
         shm_fence();
     }
+    // rc == 0: already freed, nothing to do
 }

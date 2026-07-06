@@ -36,6 +36,7 @@ pub fn main() -> i32 {
         let p1 = shm_alloc_page();
         if p1 == p as isize {
             println!("✓ page idx={} was recycled (freed by internal GC)", p);
+            shm_free_page(p1 as usize);
         } else if p1 >= 0 {
             shm_free_page(p1 as usize);
         }

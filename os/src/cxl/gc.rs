@@ -6,6 +6,47 @@
 
 use super::layout::*;
 
+/// Drain ALL pending GC entries and return them to the freelist.
+/// Used during SHM re-join to clean up stale entries from a
+/// previous session.  Bypasses the vector-clock check because
+/// the previous session is dead and all entries are eligible.
+pub unsafe fn gc_drain_on_join() -> usize {
+    let head = unsafe { shm_read32(OFF_GC_HEAD) as usize };
+    let mut freed = 0usize;
+
+    for i in 0..head.min(GC_PENDING_ENTRIES) {
+        let entry_off = GC_PENDING_OFF + i * GC_ENTRY_SIZE;
+        let flags_ptr = (SHM_BASE + entry_off + 12) as *mut u8;
+        let flags = flags_ptr.read_volatile();
+        if (flags & 0x80) == 0 { continue; }
+
+        let page_idx = unsafe { shm_read32(entry_off) as usize };
+
+        unsafe {
+            let owner_ptr = (SHM_BASE + OWNER_OFF + page_idx) as *mut u8;
+            owner_ptr.write_volatile(0u8);
+            shm_write32(REFCOUNT_OFF + page_idx * 4, 0);
+
+            let old_head = shm_read32(OFF_FREE_HEAD);
+            let fl_ptr = (SHM_BASE + FREELIST_OFF + page_idx * 4) as *mut u32;
+            fl_ptr.write_volatile(old_head);
+            shm_fence();
+            shm_write32(OFF_FREE_HEAD, page_idx as u32);
+            shm_fence();
+        }
+
+        unsafe { flags_ptr.write_volatile(0u8) };
+        freed += 1;
+    }
+
+    unsafe {
+        shm_write32(OFF_GC_HEAD, 0);
+        shm_fence();
+    }
+
+    freed
+}
+
 /// Walk the GC-pending list and return freed pages.
 pub unsafe fn shm_gc_collect() -> usize {
     let me = super::allocator::me();

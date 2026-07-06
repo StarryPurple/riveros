@@ -108,18 +108,26 @@ pub unsafe fn tx_pop() -> Option<[u8; MSG_SIZE]> {
 
 // ── Ring RX (Client->Server direction) ──
 
+/// Reset RX ring to empty (safe when no concurrent access).
+pub unsafe fn reset_rx() {
+    unsafe {
+        shm_write32(OFF_RX_HEAD, 0);
+        shm_write32(OFF_RX_TAIL, 0);
+        for slot in 0..RING_CAPACITY {
+            let entry = OFF_RX_ENTRIES + slot * 64;
+            let flag = (SHM_BASE + entry) as *mut u32;
+            flag.write_volatile(0u32);
+        }
+        shm_fence();
+    }
+}
+
 /// Sanity: reset head/tail if stale session left garbage.
 unsafe fn sanitize_rx() {
     let h = shm_read32(OFF_RX_HEAD);
     let t = shm_read32(OFF_RX_TAIL);
     if h >= 1024 || t >= 1024 || h < t {
-        shm_write32(OFF_RX_HEAD, 0);
-        shm_write32(OFF_RX_TAIL, 0);
-        for slot in 0..RING_CAPACITY {
-            let entry = OFF_RX_ENTRIES + slot * 64;
-            (SHM_BASE + entry as usize) as *mut u32;
-        }
-        shm_fence();
+        reset_rx();
     }
 }
 

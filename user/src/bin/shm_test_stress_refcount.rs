@@ -35,6 +35,8 @@ pub fn main() -> i32 {
     // Verify alloc still works
     let p2 = shm_alloc_page();
     if p2 >= 0 {
+        shm_free_page(p2 as usize);
+        shm_gc_collect();
         println!("  PASS: re-alloc after high refcount works");
         0
     } else {

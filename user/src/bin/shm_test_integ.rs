@@ -4,7 +4,7 @@
 #[macro_use]
 extern crate user_lib;
 
-use user_lib::shm_alloc_page;
+use user_lib::{shm_alloc_page, shm_free_page, shm_gc_collect};
 
 /// Verify that the cross-ring reserved pages (indices 16096..16100)
 /// are NOT allocatable through Step5's shm_alloc_page().
@@ -18,6 +18,8 @@ pub fn main() -> i32 {
     // Allocate N pages — the allocator returns indices from the freelist.
     // The reserved pages (16096..=16100) should never appear.
     const N: usize = 500;
+    let mut allocated = [0usize; N];
+    let mut count = 0;
     for i in 0..N {
         let idx = shm_alloc_page();
         if idx < 0 {
@@ -29,14 +31,18 @@ pub fn main() -> i32 {
             println!("  FAIL: allocated reserved page idx={}", idx);
             failures += 1;
         }
+        allocated[count] = idx;
+        count += 1;
     }
 
     if failures == 0 {
-        println!("  ✓ No reserved pages were allocated ({} pages checked)", N);
+        println!("  ✓ No reserved pages were allocated ({} pages checked)", count);
     }
 
-    // Free them all (best-effort; GC handles the rest)
-    // Not strictly needed since GC collect can clean up later.
+    for i in 0..count {
+        shm_free_page(allocated[i]);
+    }
+    shm_gc_collect();
 
     if failures == 0 {
         println!("=== Integration test passed ===");
