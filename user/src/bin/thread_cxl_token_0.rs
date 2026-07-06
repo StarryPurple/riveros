@@ -4,7 +4,7 @@
 #[macro_use]
 extern crate user_lib;
 
-use user_lib::{cxl_tx_push, cxl_rx_pop, shm_alloc_page, shm_free_page, shm_gc_collect, get_time};
+use user_lib::{cxl_tx_push, cxl_rx_pop, shm_alloc_page, shm_free_page, shm_gc_collect, get_time, msg_seal, msg_verify};
 
 const TOTAL_TOKENS: usize = 20;
 

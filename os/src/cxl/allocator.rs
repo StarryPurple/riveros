@@ -12,7 +12,7 @@ const FREE_END: u32 = !0u32; // sentinel — end of freelist
 // Cross-VM ring + Ring1 entries reside at SHM data pages starting here.
 // Must match channel/cross.rs CROSS_BASE and cxl/layout.rs OFF_RX_ENTRIES.
 pub const CROSS_RING_PAGE_START: usize = 0x3EE0; // 16096
-pub const CROSS_RING_PAGE_COUNT: usize = 5;       // 20KB: cross rings(16KB) + ring1 entries(4KB)
+pub const CROSS_RING_PAGE_COUNT: usize = 9;       // 36KB: cross rings(16KB) + RX(4KB) + mailboxes(16KB)
 
 static mut MY_ID: usize = 0;
 

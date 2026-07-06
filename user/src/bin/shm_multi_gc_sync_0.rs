@@ -4,16 +4,18 @@
 #[macro_use]
 extern crate user_lib;
 
-use user_lib::{cxl_tx_push, cxl_rx_pop, shm_alloc_page, shm_free_page, shm_ref_page, shm_gc_collect};
+use user_lib::{cxl_tx_push, cxl_rx_pop, shm_alloc_page, shm_free_page, shm_ref_page, shm_gc_collect, msg_seal, msg_verify};
 
 fn make_msg(idx: usize, tag: u8) -> [u8; 60] {
     let mut m = [0u8; 60];
     m[0..4].copy_from_slice(&(idx as u32).to_le_bytes());
     m[4] = tag;
+    msg_seal(&mut m, 0);
     m
 }
 
 fn read_msg(msg: &[u8; 60]) -> (usize, u8) {
+    assert!(msg_verify(msg).is_some(), "checksum");
     let idx = u32::from_le_bytes([msg[0], msg[1], msg[2], msg[3]]) as usize;
     (idx, msg[4])
 }

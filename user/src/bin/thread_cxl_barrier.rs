@@ -6,7 +6,8 @@ extern crate user_lib;
 
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use user_lib::{cxl_mmap, cxl_munmap, cxl_tx_push, cxl_rx_pop, cxl_tx_pop, cxl_rx_push,
-               thread_create, waittid, exit, yield_, get_time, get_instance_id};
+               thread_create, waittid, exit, yield_, get_time, get_instance_id,
+               msg_seal, msg_verify};
 
 const ROUNDS: usize = 10;
 const LOCAL_THREADS: usize = 3;
@@ -23,13 +24,15 @@ static LOCAL_DONE: [AtomicBool; LOCAL_THREADS] = [
 ];
 static START: AtomicBool = AtomicBool::new(false);
 
-fn make_msg(tag: u8, val: usize) -> [u8; 60] {
+fn make_msg(tag: u8, val: usize, sender: usize) -> [u8; 60] {
     let mut m = [0u8; 60];
     m[0] = tag;
     m[1..9].copy_from_slice(&(val as u64).to_le_bytes());
+    msg_seal(&mut m, sender);
     m
 }
 fn read_msg(m: &[u8; 60]) -> (u8, usize) {
+    assert!(msg_verify(m).is_some(), "checksum");
     let mut b = [0u8; 8]; b.copy_from_slice(&m[1..9]);
     (m[0], u64::from_le_bytes(b) as usize)
 }
@@ -44,7 +47,7 @@ fn coord_worker(id: usize) -> ! {
         let cnt = b.arrived.fetch_add(1, Ordering::AcqRel) + 1;
         if cnt == LOCAL_THREADS {
             // I'm last — signal peer, wait for peer, then release
-            while cxl_tx_push(&make_msg(1, b.round.load(Ordering::Relaxed))) != 0 {}
+            while cxl_tx_push(&make_msg(1, b.round.load(Ordering::Relaxed), 0)) != 0 {}
             let mut reply = [0u8; 60];
             loop {
                 if cxl_rx_pop(&mut reply) == 0 {
@@ -76,7 +79,7 @@ fn part_worker(id: usize) -> ! {
         let cnt = b.arrived.fetch_add(1, Ordering::AcqRel) + 1;
         if cnt == LOCAL_THREADS {
             // Last local thread: signal peer (mirror direction)
-            while cxl_rx_push(&make_msg(2, b.round.load(Ordering::Relaxed))) != 0 {}
+            while cxl_rx_push(&make_msg(2, b.round.load(Ordering::Relaxed), 1)) != 0 {}
             // Wait for peer's release signal
             let mut sig = [0u8; 60];
             loop {

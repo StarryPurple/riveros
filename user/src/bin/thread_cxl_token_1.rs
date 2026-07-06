@@ -4,7 +4,7 @@
 #[macro_use]
 extern crate user_lib;
 
-use user_lib::{cxl_tx_pop, cxl_rx_push, shm_free_page, shm_gc_collect};
+use user_lib::{cxl_tx_pop, cxl_rx_push, shm_free_page, shm_gc_collect, msg_seal, msg_verify};
 
 const REQUEST_BURST: usize = 8;
 const TOTAL_REQUESTS: usize = 4; // Request burst 4 times

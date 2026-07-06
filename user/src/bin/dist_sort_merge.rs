@@ -5,7 +5,7 @@
 extern crate user_lib;
 
 use user_lib::{cxl_tx_push, cxl_rx_pop, cxl_tx_pop, cxl_rx_push,
-               get_time, get_instance_id};
+               get_time, get_instance_id, msg_seal, msg_verify};
 
 const TAG_BATCH:  u8 = 1;
 const TAG_DATA:   u8 = 2;
@@ -19,16 +19,18 @@ const BATCH_SIZE: usize = 64; // numbers per batch
 const TOTAL: usize = BATCHES * BATCH_SIZE; // 1024 numbers total
 const GEN_SEED: u64 = 0x5EED_5EED;
 
-fn make_msg(tag: u8, vals: &[u64]) -> [u8; 60] {
+fn make_msg(tag: u8, vals: &[u64], sender: usize) -> [u8; 60] {
     let mut m = [0u8; 60];
     m[0] = tag;
     let n = vals.len().min(7);
     for i in 0..n {
         m[1 + i*8..9 + i*8].copy_from_slice(&vals[i].to_le_bytes());
     }
+    msg_seal(&mut m, sender);
     m
 }
 fn read_msg(m: &[u8; 60]) -> (u8, [u64; 7]) {
+    assert!(msg_verify(m).is_some(), "checksum");
     let mut vals = [0u64; 7];
     for i in 0..7 {
         let mut b = [0u8; 8];
@@ -68,7 +70,7 @@ fn run_master() -> i32 {
         }
 
         // Send batch header with count
-        let hdr = make_msg(TAG_BATCH, &[BATCH_SIZE as u64, 0,0,0,0,0,0]);
+        let hdr = make_msg(TAG_BATCH, &[BATCH_SIZE as u64, 0,0,0,0,0,0], 0);
         while cxl_tx_push(&hdr) != 0 {}
 
         // Send data in chunks of PER_MSG
@@ -77,7 +79,7 @@ fn run_master() -> i32 {
             let chunk_len = (BATCH_SIZE - sent).min(PER_MSG);
             let mut chunk = [0u64; 7];
             for i in 0..chunk_len { chunk[i] = data[sent + i]; }
-            while cxl_tx_push(&make_msg(TAG_DATA, &chunk)) != 0 {}
+            while cxl_tx_push(&make_msg(TAG_DATA, &chunk, 0)) != 0 {}
             sent += chunk_len;
         }
 
@@ -116,11 +118,11 @@ fn run_master() -> i32 {
         }
         if b < 3 { println!("  Master: batch {} verified OK", b); }
 
-        while cxl_tx_push(&make_msg(TAG_ACK, &[])) != 0 {}
+        while cxl_tx_push(&make_msg(TAG_ACK, &[], 0)) != 0 {}
     }
 
     // Signal done
-    while cxl_tx_push(&make_msg(TAG_DONE, &[])) != 0 {}
+    while cxl_tx_push(&make_msg(TAG_DONE, &[], 0)) != 0 {}
     let ms = get_time() - t0;
     let total_ops = (TOTAL * 2) as u64; // send + receive per number
     println!("  Master: all {} batches OK in {} ms ({} ops/s)",
@@ -174,7 +176,7 @@ fn run_worker() -> i32 {
             let chunk_len = (batch_size - sent).min(PER_MSG);
             let mut chunk = [0u64; 7];
             for i in 0..chunk_len { chunk[i] = buf[sent + i]; }
-            while cxl_rx_push(&make_msg(TAG_RESULT, &chunk)) != 0 {}
+            while cxl_rx_push(&make_msg(TAG_RESULT, &chunk, 1)) != 0 {}
             sent += chunk_len;
         }
 

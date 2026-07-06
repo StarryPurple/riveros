@@ -4,7 +4,7 @@
 #[macro_use]
 extern crate user_lib;
 
-use user_lib::{cxl_tx_pop, cxl_rx_push, shm_ref_page, shm_free_page, shm_gc_collect};
+use user_lib::{cxl_tx_pop, cxl_rx_push, shm_ref_page, shm_free_page, shm_gc_collect, msg_seal, msg_verify};
 
 const TAG_PAGE: u8 = 0;
 const TAG_BULK_DONE: u8 = 2;
@@ -13,10 +13,12 @@ const TAG_ACK: u8 = 1;
 fn make_msg(_idx: usize, tag: u8) -> [u8; 60] {
     let mut m = [0u8; 60];
     m[4] = tag;
+    msg_seal(&mut m, 1);
     m
 }
 
 fn read_msg(msg: &[u8; 60]) -> (usize, u8) {
+    assert!(msg_verify(msg).is_some(), "checksum");
     let idx = u32::from_le_bytes([msg[0], msg[1], msg[2], msg[3]]) as usize;
     (idx, msg[4])
 }

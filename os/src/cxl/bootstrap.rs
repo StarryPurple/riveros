@@ -28,8 +28,9 @@ pub fn shm_init(my_id: usize) -> (usize, bool) {
             shm_write64(OFF_MAGIC, SHM_MAGIC);
             shm_write32(OFF_N_INSTANCES, 0);
             shm_write32(OFF_GC_HEAD, 0);
-            super::ring::reset();
+            super::ring::reset_tx();
             super::ring::reset_rx();
+            super::mbox::mbox_reset_all();
             shm_write32(OFF_DATA_START, DATA_START as u32);
             shm_write32(OFF_TOTAL_PAGES, DATA_PAGE_COUNT as u32);
             allocator::shm_init_freelist();
@@ -74,13 +75,22 @@ pub fn shm_init(my_id: usize) -> (usize, bool) {
         (my_id, false)
 
     } else {
-        // SHM already exists, join
-        // Drain stale GC entries from previous session then reset
-        // ring state (stale head/tail + flags)
+        // SHM already exists — full cleanup of previous-session state
         unsafe {
+            // 1. Drain pending GC entries (reclaim leaked pages)
             super::gc::gc_drain_on_join();
-            super::ring::reset();
+            // 2. Reset vector clocks to a clean baseline
+            super::gc::reset_vc();
+            // 3. Reset TX ring (head/tail/flags + slot payload)
+            super::ring::reset_tx();
+            // 4. Reset RX ring (head/tail/flags + slot payload)
             super::ring::reset_rx();
+            // 5. Zero the cross-ring shared-memory area (stale data-plane data)
+            super::ring::reset_cross_area();
+            // 6. Reset all mailboxes
+            super::mbox::mbox_reset_all();
+            // 7. Clear all bakery lock slots (crashed peers, stale state)
+            reset_all_bakery();
         }
         unsafe { reset_bakery_id(my_id); }
         let n_inst = unsafe { shm_read32(OFF_N_INSTANCES) };
@@ -98,5 +108,15 @@ unsafe fn reset_bakery_id(me: usize) {
     unsafe { shm_write64(OFF_NUMBER + me * 8, 0) };
     let p = (SHM_BASE + OFF_CHOOSING + me) as *mut u8;
     unsafe { p.write_volatile(0u8) };
+    unsafe { shm_fence() };
+}
+
+/// Clear all bakery slots — removes stale lock state from crashed peers.
+unsafe fn reset_all_bakery() {
+    for i in 0..MAX_INSTANCES {
+        unsafe { shm_write64(OFF_NUMBER + i * 8, 0) };
+        let p = (SHM_BASE + OFF_CHOOSING + i) as *mut u8;
+        unsafe { p.write_volatile(0u8) };
+    }
     unsafe { shm_fence() };
 }

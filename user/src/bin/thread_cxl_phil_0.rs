@@ -5,7 +5,7 @@
 extern crate user_lib;
 
 use user_lib::{cxl_tx_push, cxl_rx_pop,
-               shm_alloc_page, shm_free_page, shm_gc_collect};
+               shm_alloc_page, shm_free_page, shm_gc_collect, msg_seal, msg_verify};
 
 const MEALS: usize = 3;
 

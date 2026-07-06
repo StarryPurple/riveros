@@ -53,8 +53,14 @@ impl PageMigrator {
                 let alloc = FRAME_ALLOCATOR.exclusive_access();
                 (alloc.is_pinned(ppn), alloc.page_tier(ppn))
             };
-            if pinned { continue; }
-            match tier {
+        if pinned { continue; }
+        // Never migrate executable pages — ivshmem BAR is non-executable (RustSBI PMP)
+        if pte.flags().contains(super::page_table::PTEFlags::X) {
+            pte.clear_accessed();
+            if pte.dirty() { pte.clear_dirty(); }
+            continue;
+        }
+        match tier {
                 Some(MemoryTier::Fast) => {
                     if !pte.accessed() && !pte.dirty() {
                         // completely cold: not read nor written

@@ -10,14 +10,19 @@ pub const WINDOW: u32 = RING_CAPACITY as u32;
 pub const MASK: u32 = WINDOW - 1;
 pub const MSG_SIZE: usize = 60;
 
-/// Reset the ring to empty (safe to call when no concurrent access).
-pub unsafe fn reset() {
+/// Reset TX ring to empty (safe to call when no concurrent access).
+pub unsafe fn reset_tx() {
     unsafe { shm_write32(OFF_TX_HEAD, 0); }
     unsafe { shm_write32(OFF_TX_TAIL, 0); }
     for slot in 0..RING_CAPACITY {
         let entry = OFF_TX_ENTRIES + slot * 64;
         let flag = (SHM_BASE + entry) as *mut u32;
         unsafe { flag.write_volatile(0u32); }
+        // Also clear the 60-byte payload so stale messages aren't misinterpreted
+        for b in 0..MSG_SIZE {
+            let p = (SHM_BASE + entry + 4 + b) as *mut u8;
+            unsafe { p.write_volatile(0u8); }
+        }
     }
 }
 
@@ -117,9 +122,24 @@ pub unsafe fn reset_rx() {
             let entry = OFF_RX_ENTRIES + slot * 64;
             let flag = (SHM_BASE + entry) as *mut u32;
             flag.write_volatile(0u32);
+            for b in 0..MSG_SIZE {
+                let p = (SHM_BASE + entry + 4 + b) as *mut u8;
+                p.write_volatile(0u8);
+            }
         }
         shm_fence();
     }
+}
+
+/// Zero out the entire cross-ring shared-memory area (used during SHM re-join
+/// to clear stale data-plane data from a previous session).
+pub unsafe fn reset_cross_area() {
+    let base = SHM_BASE + CROSS_RING_OFFSET;
+    for i in 0..CROSS_RING_TOTAL {
+        let p = (base + i) as *mut u8;
+        unsafe { p.write_volatile(0u8); }
+    }
+    unsafe { shm_fence(); }
 }
 
 /// Sanity: reset head/tail if stale session left garbage.

@@ -167,3 +167,38 @@ pub fn sys_shm_unref_page(idx: usize) -> isize {
 pub fn sys_shm_gc_collect() -> isize {
     unsafe { crate::cxl::gc::shm_gc_collect() as isize }
 }
+
+// ── Mailbox syscalls ──
+
+pub fn sys_cxl_mbox_send(target: usize, buf: *const u8) -> isize {
+    let mut msg = [0u8; crate::cxl::ring::MSG_SIZE];
+    let token = current_user_token();
+    let src = unsafe { crate::mm::translated_byte_buffer(token, buf, msg.len()) };
+    let mut copied = 0usize;
+    for seg in src {
+        let len = seg.len().min(msg.len() - copied);
+        msg[copied..copied + len].copy_from_slice(&seg[..len]);
+        copied += len;
+        if copied >= msg.len() { break; }
+    }
+    if unsafe { crate::cxl::mbox::mbox_send(crate::cxl::allocator::me(), target, &msg) } { 0 } else { -1 }
+}
+
+pub fn sys_cxl_mbox_recv(buf: *mut u8) -> isize {
+    let result = unsafe { crate::cxl::mbox::mbox_recv(crate::cxl::allocator::me()) };
+    match result {
+        None => -1,
+        Some(msg) => {
+            let token = current_user_token();
+            let dst = unsafe { crate::mm::translated_byte_buffer(token, buf, msg.len()) };
+            let mut copied = 0usize;
+            for seg in dst {
+                let len = seg.len().min(msg.len() - copied);
+                seg[..len].copy_from_slice(&msg[copied..copied + len]);
+                copied += len;
+                if copied >= msg.len() { break; }
+            }
+            0
+        }
+    }
+}

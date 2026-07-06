@@ -265,6 +265,8 @@ const SYSCALL_SHM_REF_PAGE: usize = 6002;
 const SYSCALL_SHM_UNREF_PAGE: usize = 6003;
 const SYSCALL_SHM_GC_COLLECT: usize = 6004;
 const SYSCALL_GET_INSTANCE_ID: usize = 6005;
+const SYSCALL_MBOX_SEND: usize = 6006;
+const SYSCALL_MBOX_RECV: usize = 6007;
 
 pub fn sys_shm_alloc_page() -> isize {
     syscall(SYSCALL_SHM_ALLOC_PAGE, [0, 0, 0])
@@ -284,4 +286,12 @@ pub fn sys_shm_gc_collect() -> isize {
 
 pub fn sys_get_instance_id() -> isize {
     syscall(SYSCALL_GET_INSTANCE_ID, [0, 0, 0])
+}
+
+pub fn sys_cxl_mbox_send(target: usize, buf: *const u8) -> isize {
+    syscall(SYSCALL_MBOX_SEND, [target, buf as usize, 0])
+}
+
+pub fn sys_cxl_mbox_recv(buf: *mut u8) -> isize {
+    syscall(SYSCALL_MBOX_RECV, [buf as usize, 0, 0])
 }

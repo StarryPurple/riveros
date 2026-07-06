@@ -58,10 +58,34 @@ pub const OFF_RX_HEAD:       usize = 0x0C0;   // u32 (was unused in page 0 heade
 pub const OFF_RX_TAIL:       usize = 0x0C4;   // u32
 pub const OFF_RX_ENTRIES:    usize = 0x3F03000; // inside cross ring data area (safe, 4KB)
 
-// Mailbox (single-slot message passing)
-pub const OFF_MBOX_SENDER:      usize = 0x500;   // u32
-pub const OFF_MBOX_PAGE:        usize = 0x504;   // u32
-pub const OFF_MBOX_READY:       usize = 0x508;   // u32
+// Cross-ring shared-memory area (data-plane, Guest↔Host communication)
+// Must match channel/cross.rs CROSS_BASE and allocator.rs CROSS_RING_PAGE_COUNT.
+pub const CROSS_RING_OFFSET: usize = 0x3F0_0000;  // start of cross-ring area in SHM
+pub const CROSS_RING_TOTAL:  usize = 36 * 1024;    // 36KB (9 pages: cross rings + RX + 4 mailboxes)
+
+// Mailbox (MPSC, 64 slots × 64 B per node)
+// Producers hold bakery lock; consumer reads lock-free.
+// Head/tail arrays placed at 0x0D0–0x0EF to avoid TX ring overlap (TX entries span 0x200–0x1200).
+pub const OFF_MBOX_HEAD:  usize = 0x0D0;   // [u32; MAX_INSTANCES]  (16 bytes)
+pub const OFF_MBOX_TAIL:  usize = 0x0E0;   // [u32; MAX_INSTANCES]  (16 bytes)
+pub const MBOX_CAPACITY:  usize = 64;
+pub const MBOX_SLOT_SIZE: usize = 64;
+// Mailbox entry pages in the cross-ring area (1 page = 4 KB each)
+pub const OFF_MBOX_ENTRIES0: usize = 0x3F04000;  // MBOX[0] (Node0)
+pub const OFF_MBOX_ENTRIES1: usize = 0x3F05000;  // MBOX[1] (Node1)
+pub const OFF_MBOX_ENTRIES2: usize = 0x3F06000;  // MBOX[2] (Node2)
+pub const OFF_MBOX_ENTRIES3: usize = 0x3F07000;  // MBOX[3] (Node3)
+
+/// Get the entry area offset for a specific node's mailbox.
+#[inline]
+pub const fn mbox_entries_off(node: usize) -> usize {
+    match node {
+        0 => OFF_MBOX_ENTRIES0,
+        1 => OFF_MBOX_ENTRIES1,
+        2 => OFF_MBOX_ENTRIES2,
+        _ => OFF_MBOX_ENTRIES3,
+    }
+}
 
 // ── Metadata array pages (Pages 1..31) ──
 //

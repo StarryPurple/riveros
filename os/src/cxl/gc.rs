@@ -47,6 +47,15 @@ pub unsafe fn gc_drain_on_join() -> usize {
     freed
 }
 
+/// Reset all vector clocks to zero. Called during SHM re-join
+/// so the new session starts with a clean VC baseline.
+pub unsafe fn reset_vc() {
+    for i in 0..MAX_INSTANCES {
+        unsafe { shm_write64(OFF_GLOBAL_VC + i * 8, 0); }
+    }
+    unsafe { shm_fence(); }
+}
+
 /// Walk the GC-pending list and return freed pages.
 pub unsafe fn shm_gc_collect() -> usize {
     let me = super::allocator::me();
