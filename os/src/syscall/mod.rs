@@ -48,6 +48,7 @@ const SYSCALL_SHM_FREE_PAGE: usize = 6001;
 const SYSCALL_SHM_REF_PAGE: usize = 6002;
 const SYSCALL_SHM_UNREF_PAGE: usize = 6003;
 const SYSCALL_SHM_GC_COLLECT: usize = 6004;
+const SYSCALL_GET_INSTANCE_ID: usize = 6005;
 const SYSCALL_CXL_TX_PUSH: usize = 4003;
 const SYSCALL_CXL_TX_POP: usize = 4004;
 const SYSCALL_CXL_RX_PUSH: usize = 4005;
@@ -125,6 +126,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         SYSCALL_SHM_REF_PAGE => sys_shm_ref_page(args[0]),
         SYSCALL_SHM_UNREF_PAGE => sys_shm_unref_page(args[0]),
         SYSCALL_SHM_GC_COLLECT => sys_shm_gc_collect(),
+        SYSCALL_GET_INSTANCE_ID => crate::cxl::allocator::me() as isize,
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     }
 }

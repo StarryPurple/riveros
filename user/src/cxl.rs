@@ -55,3 +55,7 @@ pub fn shm_unref_page(idx: usize) -> isize {
 pub fn shm_gc_collect() -> isize {
     sys_shm_gc_collect()
 }
+
+pub fn get_instance_id() -> usize {
+    sys_get_instance_id() as usize
+}

@@ -264,6 +264,7 @@ const SYSCALL_SHM_FREE_PAGE: usize = 6001;
 const SYSCALL_SHM_REF_PAGE: usize = 6002;
 const SYSCALL_SHM_UNREF_PAGE: usize = 6003;
 const SYSCALL_SHM_GC_COLLECT: usize = 6004;
+const SYSCALL_GET_INSTANCE_ID: usize = 6005;
 
 pub fn sys_shm_alloc_page() -> isize {
     syscall(SYSCALL_SHM_ALLOC_PAGE, [0, 0, 0])
@@ -279,4 +280,8 @@ pub fn sys_shm_unref_page(idx: usize) -> isize {
 }
 pub fn sys_shm_gc_collect() -> isize {
     syscall(SYSCALL_SHM_GC_COLLECT, [0, 0, 0])
+}
+
+pub fn sys_get_instance_id() -> isize {
+    syscall(SYSCALL_GET_INSTANCE_ID, [0, 0, 0])
 }
