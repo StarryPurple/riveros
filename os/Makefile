@@ -63,6 +63,11 @@ kernel:
 clean:
 	@cargo clean
 
+# Zero all CXL pool backing files for a fresh start
+fresh-shm:
+	@for f in ../cxl-mem/cxl*.mem; do dd if=/dev/zero of=$$f bs=1M count=32 2>/dev/null; done
+	@echo "CXL pools zeroed"
+
 disasm: kernel
 	@$(OBJDUMP) $(DISASM) $(KERNEL_ELF) | less
 

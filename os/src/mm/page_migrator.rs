@@ -45,6 +45,12 @@ impl PageMigrator {
         let ptes = page_table.collect_ptes();
         for (vpn, pte) in ptes {
             let ppn = pte.ppn();
+            // Never migrate executable pages — CXL BAR is non-executable
+            if pte.flags().contains(super::page_table::PTEFlags::X) {
+                pte.clear_accessed();
+                if pte.dirty() { pte.clear_dirty(); }
+                continue;
+            }
             let tier = FRAME_ALLOCATOR.exclusive_access().page_tier(ppn);
             match tier {
                 Some(MemoryTier::Fast) => {
