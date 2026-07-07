@@ -8,7 +8,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 use user_lib::{shm_alloc_page, shm_free_page, shm_ref_page, shm_gc_collect};
 
-const N: usize = 200;
+const N: usize = 500;
 
 #[unsafe(no_mangle)]
 pub fn main() -> i32 {

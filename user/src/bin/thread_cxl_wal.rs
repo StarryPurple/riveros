@@ -124,9 +124,9 @@ pub fn main() -> i32 {
     core::sync::atomic::fence(Ordering::SeqCst);
 
     let ok2 = recovery_check();
-    println!("  corrupt entry recovery: {}", if ok2 { "WARNING: bad checksum NOT detected" }
-                                         else { "PASS: bad checksum rejected" });
+    println!("  corrupt entry recovery: {}", if ok2 { "PASS: bad checksum rejected" }
+                                             else { "WARNING: bad checksum NOT detected" });
 
     cxl_munmap(va as usize, sz);
-    if ok && !ok2 { 0 } else { 1 }
+    if ok && ok2 { 0 } else { 1 }
 }

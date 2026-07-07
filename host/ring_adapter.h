@@ -10,7 +10,7 @@
 extern "C" {
 #endif
 
-/* ── Must match user/src/ring.rs RingHeader exactly ── */
+/* Must match user/src/ring.rs RingHeader exactly */
 
 typedef struct {
     atomic_uint_least64_t head;      /* offset 0 */

@@ -6,7 +6,7 @@ extern crate user_lib;
 
 use user_lib::{cxl_tx_pop, cxl_rx_push, shm_ref_page, shm_free_page, shm_gc_collect, msg_seal, msg_verify};
 
-const ROUNDS: usize = 12;
+const ROUNDS: usize = 48;
 
 fn make_msg(idx: usize, tag: u8) -> [u8; 60] {
     let mut m = [0u8; 60];

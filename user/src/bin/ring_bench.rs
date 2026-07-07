@@ -86,7 +86,7 @@ pub fn main() -> i32 {
     println!("=== Ring Buffer Benchmark (single-core QEMU) ===");
     println!("Iterations: {}, msg: {} B", ITERS, MSG_SIZE);
 
-    // ── 1. LockFreeRing (yield) ──
+    // 1. LockFreeRing (yield)
     let mut vaddr: usize = 0;
     let fd = sys_ring_create(RING_CAP, &mut vaddr as *mut usize);
     assert!(fd >= 0);
@@ -97,7 +97,7 @@ pub fn main() -> i32 {
         &ring as *const _ as usize);
     sys_ring_destroy(fd as usize);
 
-    // ── 2. LockFreeRing (hybrid, spin=10) ──
+    // 2. LockFreeRing (hybrid, spin=10)
     let mut vaddr2: usize = 0;
     let fd2 = sys_ring_create(RING_CAP, &mut vaddr2 as *mut usize);
     assert!(fd2 >= 0);
@@ -110,7 +110,7 @@ pub fn main() -> i32 {
     unsafe { drop(Box::from_raw(arg2)); }
     sys_ring_destroy(fd2 as usize);
 
-    // ── 3. LockFreeRing (busy-poll) ──
+    // 3. LockFreeRing (busy-poll)
     let mut vaddr3: usize = 0;
     let fd3 = sys_ring_create(RING_CAP, &mut vaddr3 as *mut usize);
     assert!(fd3 >= 0);
@@ -121,7 +121,7 @@ pub fn main() -> i32 {
         &ring3 as *const _ as usize);
     sys_ring_destroy(fd3 as usize);
 
-    // ── 4. Pipe ──
+    // 4. Pipe
     let mut fds = [0usize; 2];
     pipe(&mut fds);
     let start = get_time();
@@ -131,7 +131,7 @@ pub fn main() -> i32 {
     waittid(pr as usize);
     let t_pipe = (get_time() - start) as usize;
 
-    // ── Results ──
+    // Results
     let total = (ITERS * MSG_SIZE) as u64;
     let total = total; // prevent unused mut
     macro_rules! bps {

@@ -9,7 +9,7 @@ use user_lib::{cxl_tx_push, cxl_tx_pop, cxl_rx_push, cxl_rx_pop,
                sys_ring_create_cross, get_instance_id, msg_seal, msg_verify};
 
 const DATA_BASE:    usize = 128;  // safely past any kernel-initialised RingHeader
-const PATTERN_SIZE: usize = 1024;
+const PATTERN_SIZE: usize = 4096;
 const RESP_OFFSET:  usize = 4096; // second 4KB — well clear of pattern area
 
 fn make_ctrl(tag: u8, offset: u32, len: u32, sender: usize) -> [u8; 60] {

@@ -7,7 +7,7 @@ extern crate user_lib;
 use user_lib::{cxl_tx_push, cxl_tx_pop, cxl_rx_push, cxl_rx_pop,
                get_time, get_instance_id, msg_seal, msg_verify};
 
-const REQUESTS: usize = 64;
+const REQUESTS: usize = 256;
 
 fn make_req(id: u32, op: u8, val: u32, sender: usize) -> [u8; 60] {
     let mut m = [0u8; 60];

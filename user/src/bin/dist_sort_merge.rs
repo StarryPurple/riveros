@@ -14,8 +14,8 @@ const TAG_ACK:    u8 = 4;
 const TAG_DONE:   u8 = 9;
 
 const PER_MSG: usize = 7; // each msg carries up to 7 u64 values
-const BATCHES: usize = 16;
-const BATCH_SIZE: usize = 64; // numbers per batch
+const BATCHES: usize = 8;
+const BATCH_SIZE: usize = 256; // numbers per batch
 const TOTAL: usize = BATCHES * BATCH_SIZE; // 1024 numbers total
 const GEN_SEED: u64 = 0x5EED_5EED;
 

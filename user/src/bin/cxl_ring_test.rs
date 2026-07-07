@@ -11,7 +11,7 @@ use user_lib::{cxl_tx_push, cxl_tx_pop, fork, waitpid, exit};
 pub fn main() -> i32 {
     println!("=== CXL Ring Buffer Test ===\n");
 
-    // ── Sequential push/pop ──
+    // Sequential push/pop
     println!("--- Round-trip test ---");
     let msg: [u8; 60] = {
         let mut m = [0u8; 60];
@@ -29,11 +29,11 @@ pub fn main() -> i32 {
         core::str::from_utf8(&msg[..18]).unwrap_or("??"),
         core::str::from_utf8(&out[..18]).unwrap_or("??"));
 
-    // ── Fork-based busy-poll ──
+    // Fork-based busy-poll
     println!("\n--- Fork busy-poll test ---");
     let pid = fork();
     if pid == 0 {
-        // ── child: busy-pop until we receive a quit marker ──
+        // child: busy-pop until we receive a quit marker
         let mut buf = [0u8; 60];
         loop {
             while cxl_tx_pop(&mut buf) != 0 {
@@ -48,7 +48,7 @@ pub fn main() -> i32 {
         exit(0);
     }
 
-    // ── parent: push 50 messages + quit marker ──
+    // parent: push 50 messages + quit marker
     let mut payload = [0u8; 60];
     for i in 0..50 {
         payload[0] = 0xAA;

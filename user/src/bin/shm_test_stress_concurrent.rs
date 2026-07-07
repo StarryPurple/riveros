@@ -8,7 +8,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 use user_lib::{shm_alloc_page, shm_free_page, thread_create, waittid, exit, yield_};
 
-const N: usize = 200;
+const N: usize = 500;
 
 fn worker(_arg: usize) -> ! {
     for _ in 0..3 {

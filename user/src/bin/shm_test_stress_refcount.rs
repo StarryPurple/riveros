@@ -6,7 +6,7 @@ extern crate user_lib;
 
 use user_lib::{shm_alloc_page, shm_free_page, shm_ref_page, shm_gc_collect};
 
-const REFS: usize = 50;
+const REFS: usize = 200;
 
 #[unsafe(no_mangle)]
 pub fn main() -> i32 {

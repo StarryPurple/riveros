@@ -8,14 +8,14 @@ extern crate alloc;
 use alloc::vec::Vec;
 use user_lib::{shm_alloc_page, shm_free_page, shm_gc_collect, get_time};
 
-const ITERS: usize = 500;
+const ITERS: usize = 800;
 
 #[unsafe(no_mangle)]
 pub fn main() -> i32 {
     println!("=== SHM Alloc/Free Benchmark ===");
     let mut pages = Vec::new();
 
-    // ── Alloc ──
+    // Alloc
     let start = get_time();
     for _ in 0..ITERS {
         match shm_alloc_page() {
@@ -26,7 +26,7 @@ pub fn main() -> i32 {
     let t_alloc = get_time() - start;
     let rate_alloc = if t_alloc > 0 { ITERS as u64 * 1000 / t_alloc as u64 } else { 0 };
 
-    // ── Free ──
+    // Free
     let start = get_time();
     for &idx in &pages {
         shm_free_page(idx);
@@ -35,7 +35,7 @@ pub fn main() -> i32 {
     let t_free = get_time() - start;
     let rate_free = if t_free > 0 { ITERS as u64 * 1000 / t_free as u64 } else { 0 };
 
-    // ── Results ──
+    // Results
     let total_ms = t_alloc + t_free;
     let total_ops = ITERS as u64 * 2;
     let ops_per_s = if total_ms > 0 { total_ops * 1000 / total_ms as u64 } else { 0 };

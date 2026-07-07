@@ -111,7 +111,7 @@ pub unsafe fn tx_pop() -> Option<[u8; MSG_SIZE]> {
     }
 }
 
-// ── Ring RX (Client->Server direction) ──
+// Ring RX (Client->Server direction)
 
 /// Reset RX ring to empty (safe when no concurrent access).
 pub unsafe fn reset_rx() {

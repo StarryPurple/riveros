@@ -132,7 +132,7 @@ pub fn sys_cxl_meminfo(buf: *mut CxlMemInfo) -> isize {
     0
 }
 
-// ── Syscall wrappers for SHM reference counting + GC ──
+// Syscall wrappers for SHM reference counting + GC
 
 pub fn sys_shm_alloc_page() -> isize {
     match crate::cxl::allocator::shm_alloc_page() {
@@ -168,7 +168,7 @@ pub fn sys_shm_gc_collect() -> isize {
     unsafe { crate::cxl::gc::shm_gc_collect() as isize }
 }
 
-// ── Mailbox syscalls ──
+// Mailbox syscalls
 
 pub fn sys_cxl_mbox_send(target: usize, buf: *const u8) -> isize {
     let mut msg = [0u8; crate::cxl::ring::MSG_SIZE];

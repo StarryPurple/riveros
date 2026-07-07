@@ -7,7 +7,7 @@ extern crate user_lib;
 use user_lib::{cxl_tx_push, cxl_tx_pop, cxl_rx_push, cxl_rx_pop,
                get_time, get_instance_id, msg_seal, msg_verify};
 
-const BURST: usize = 500;
+const BURST: usize = 2000;
 
 fn make_msg(seq: u32, payload: u64, sender: usize) -> [u8; 60] {
     let mut m = [0u8; 60];

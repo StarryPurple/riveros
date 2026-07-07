@@ -7,6 +7,7 @@
 
 use super::layout::*;
 use super::allocator;
+use crate::mm::{FRAME_ALLOCATOR, PhysPageNum};
 
 /// Initialise ivshmem (instance 0) OR register bakery slot (instances 1+).
 ///
@@ -17,7 +18,7 @@ pub fn shm_init(my_id: usize) -> (usize, bool) {
     let magic = unsafe { shm_read64(OFF_MAGIC) };
 
     if magic != SHM_MAGIC && my_id == 0 {
-        // ── First-ever boot: instance 0 initialises SHM ──
+        // First-ever boot: instance 0 initialises SHM
         // Mark bootstrap in progress (so late-starting peers wait)
         let lock = (SHM_BASE + OFF_BOOTSTRAP_LOCK) as *mut u32;
         unsafe { lock.write_volatile(1u32); }
@@ -37,6 +38,7 @@ pub fn shm_init(my_id: usize) -> (usize, bool) {
             // Reserve cross-ring pages in freelist (indices 16096-16099)
             allocator::reserve_cross_ring_pages();
         }
+        pin_cross_ring_pages();
         // Register instance 0's bakery slot
         unsafe { reset_bakery_id(my_id); }
         println!("[CXL] instance {} — first boot, SHM initialised", my_id);
@@ -47,7 +49,7 @@ pub fn shm_init(my_id: usize) -> (usize, bool) {
         (my_id, true)
 
     } else if magic != SHM_MAGIC && my_id != 0 {
-        // ── Boot before instance 0 finished: spin-wait for magic ──
+        // Boot before instance 0 finished: spin-wait for magic
         crate::print!("[CXL] instance {} waiting for SHM init...", my_id);
         let mut wait = 0u32;
         while unsafe { shm_read64(OFF_MAGIC) } != SHM_MAGIC {
@@ -92,6 +94,7 @@ pub fn shm_init(my_id: usize) -> (usize, bool) {
             // 7. Clear all bakery lock slots (crashed peers, stale state)
             reset_all_bakery();
         }
+        pin_cross_ring_pages();
         unsafe { reset_bakery_id(my_id); }
         let n_inst = unsafe { shm_read32(OFF_N_INSTANCES) };
         if my_id as u32 >= n_inst {
@@ -119,4 +122,15 @@ unsafe fn reset_all_bakery() {
         unsafe { p.write_volatile(0u8) };
     }
     unsafe { shm_fence() };
+}
+
+/// Pin all cross-ring reserved pages so the page migrator never
+/// promotes them to DRAM (Host accesses these pages at fixed offsets).
+fn pin_cross_ring_pages() {
+    let mut alloc = FRAME_ALLOCATOR.exclusive_access();
+    for i in 0..allocator::CROSS_RING_PAGE_COUNT {
+        let idx = allocator::CROSS_RING_PAGE_START + i;
+        let ppn = allocator::shm_page_to_ppn(idx);
+        alloc.mark_pinned(ppn);
+    }
 }

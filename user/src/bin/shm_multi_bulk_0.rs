@@ -6,7 +6,7 @@ extern crate user_lib;
 
 use user_lib::{cxl_tx_push, cxl_rx_pop, shm_alloc_page, shm_free_page, shm_gc_collect, msg_seal, msg_verify};
 
-const BULK_PAGES: usize = 32;
+const BULK_PAGES: usize = 128;
 const TAG_PAGE: u8 = 0;
 const TAG_BULK_DONE: u8 = 2;
 const TAG_ACK: u8 = 1;

@@ -16,7 +16,7 @@ pub fn main() -> i32 {
     println!("=== SHM Comprehensive Test ===");
     let mut f = 0;
 
-    // ── 1. Alloc / Free / Re-alloc ──
+    // 1. Alloc / Free / Re-alloc
     println!("--- Alloc/Free cycle ---");
     let p0 = shm_alloc_page();
     f += check(p0 >= 0, "alloc_page returns valid idx");
@@ -26,7 +26,7 @@ pub fn main() -> i32 {
     f += check(p1 >= 0, "re-alloc after free succeeds");
     if p1 >= 0 { shm_free_page(p1 as usize); }
 
-    // ── 2. Reference counting ──
+    // 2. Reference counting
     println!("--- Reference counting ---");
     let p3 = shm_alloc_page();
     if p3 < 0 { panic!("alloc"); }
@@ -40,7 +40,7 @@ pub fn main() -> i32 {
     f += check(p4 >= 0, "alloc after ref/free/gc");
     if p4 >= 0 { shm_free_page(p4 as usize); }
 
-    // ── 3. Multiple pages ──
+    // 3. Multiple pages
     println!("--- Multiple pages ---");
     let mut all_ok = true;
     let mut pages = [0usize; 16];
@@ -55,7 +55,7 @@ pub fn main() -> i32 {
     for i in 0..count { shm_free_page(pages[i]); }
     shm_gc_collect();
 
-    // ── Result ──
+    // Result
     println!("--- Summary ---");
     if f == 0 { println!("All tests passed!"); 0 }
     else      { println!("{} test(s) failed.", f); 1 }

@@ -88,7 +88,7 @@ QEMU_ARGS := -machine virt \
 			 -object memory-backend-file,id=shm0,size=64M,mem-path=../backend-file/cxl.mm,share=on \
 			 -device ivshmem-plain,memdev=shm0
 
-# ── Multi-QEMU targets (Step 5: distributive shared memory) ──
+# Multi-QEMU targets (Step 5: distributive shared memory)
 # Each instance gets a unique boot-time instance ID (0, 1, 2).
 # Serial output goes to separate log files.
 # Instance 0 is always started first (initialises SHM).

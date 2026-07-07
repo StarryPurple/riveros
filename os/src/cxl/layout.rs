@@ -8,20 +8,20 @@
 
 use crate::config::IVSHMEM_BAR_BASE;
 
-// ── Globals ──
+// Globals
 
 pub const SHM_BASE:     usize = IVSHMEM_BAR_BASE;
 pub const SHM_SIZE:     usize = 0x0400_0000;               // 64 MB
 pub const PAGE_SIZE:    usize = 0x1000;
 pub const PAGE_COUNT:   usize = SHM_SIZE / PAGE_SIZE;      // 16384
 
-// ── Region split ──
+// Region split
 
 pub const HEADER_PAGES:     usize = 32;                    // 128 KB reserved
 pub const DATA_START:       usize = HEADER_PAGES;          // first allocatable page
 pub const DATA_PAGE_COUNT:  usize = PAGE_COUNT - HEADER_PAGES;
 
-// ── Page 0 offsets (all u32/u64 aligned) ──
+// Page 0 offsets (all u32/u64 aligned)
 
 pub const OFF_MAGIC:            usize = 0x000;   // u64
 pub const OFF_N_INSTANCES:      usize = 0x008;   // u32
@@ -87,7 +87,7 @@ pub const fn mbox_entries_off(node: usize) -> usize {
     }
 }
 
-// ── Metadata array pages (Pages 1..31) ──
+// Metadata array pages (Pages 1..31)
 //
 // Page 1..7    freelist:      [u32; DATA_PAGE_COUNT]   (64 KB)
 // Page 8..14   ref_count:     [u32; DATA_PAGE_COUNT]   (64 KB)
@@ -105,12 +105,12 @@ pub const OWNER_OFF:        usize = OWNER_PAGE  * PAGE_SIZE;
 pub const GC_PENDING_OFF:   usize = GC_PENDING_PAGE * PAGE_SIZE;
 
 // Magic value
-pub const SHM_MAGIC: u64 = 0x5348_4D45_4D55_4E53; // "SHMEMUNS" in hex
+pub const SHM_MAGIC: u64 = 0x5348_4D45_4D55_4E53; // "SHMEMUNS" in hex. Why shall AI generate one magic value...
 
 /// First physical page number of the SHM data region.
 pub const SHM_DATA_PPN_BASE: usize = (SHM_BASE / PAGE_SIZE) + HEADER_PAGES;
 
-// ── Shared-memory access primitives ──
+// Shared-memory access primitives
 
 use core::arch::asm;
 

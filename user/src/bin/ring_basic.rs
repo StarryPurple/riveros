@@ -35,7 +35,7 @@ fn reader_spin(arg: usize) -> ! {
 pub fn main() -> i32 {
     println!("=== Ring Buffer Basic Test ===");
 
-    // ── 1. Create ring via syscall ──
+    // 1. Create ring via syscall
     let mut vaddr: usize = 0;
     let fd = sys_ring_create(RING_CAP, &mut vaddr as *mut usize);
     assert!(fd >= 0, "sys_ring_create failed: {}", fd);
@@ -44,7 +44,7 @@ pub fn main() -> i32 {
 
     let ring = LockFreeRing::new(vaddr as *mut u8);
 
-    // ── 2. Sequential round-trip ──
+    // 2. Sequential round-trip
     println!("--- Round-trip ---");
     let msg = [0x42u8; MSG_SIZE];
     ring.try_push(&msg).expect("push failed");
@@ -54,7 +54,7 @@ pub fn main() -> i32 {
     assert_eq!(out, msg);
     println!("  round-trip: OK");
 
-    // ── 3. Busy-poll thread test ──
+    // 3. Busy-poll thread test
     println!("--- Thread busy-poll ---");
     let r_ptr = &ring as *const LockFreeRing as usize;
     let w = thread_create(linker_symbol_addr!(writer_spin), r_ptr);
@@ -63,7 +63,7 @@ pub fn main() -> i32 {
     waittid(r as usize);
     println!("  busy-poll: OK ({} messages)", ITERS);
 
-    // ── 4. Empty/full detection ──
+    // 4. Empty/full detection
     println!("--- Boundary ---");
     assert!(ring.is_empty(), "ring should be empty after full drain");
     // Fill completely
@@ -83,7 +83,7 @@ pub fn main() -> i32 {
     assert_eq!(ring.used(), 0);
     println!("  boundary: OK");
 
-    // ── 5. Cleanup ──
+    // 5. Cleanup
     sys_ring_destroy(fd as usize);
     println!("=== All tests passed ===");
     0
