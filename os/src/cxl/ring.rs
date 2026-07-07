@@ -91,6 +91,7 @@ pub unsafe fn tx_pop() -> Option<[u8; MSG_SIZE]> {
         // wait until the producer has set flag = 1
         let flag = (SHM_BASE + entry) as *const u32;
         while flag.read_volatile() != 1 {
+            core::arch::asm!("wfi", options(nostack));
             shm_fence();
         }
         shm_fence();

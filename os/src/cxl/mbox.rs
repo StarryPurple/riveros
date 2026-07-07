@@ -62,6 +62,7 @@ pub unsafe fn mbox_recv(me: usize) -> Option<[u8; crate::cxl::ring::MSG_SIZE]> {
     let flag = (SHM_BASE + entry_base) as *const u32;
     unsafe {
         while flag.read_volatile() != 1 {
+            core::arch::asm!("wfi", options(nostack));
             shm_fence();
         }
         shm_fence();
