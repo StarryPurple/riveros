@@ -26,5 +26,3 @@ pushall.sh
 /.kiro/
 /.cody/
 /.copilot/
-
-/docs/*
